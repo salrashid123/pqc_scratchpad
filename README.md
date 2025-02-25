@@ -8,9 +8,9 @@ This repo is just a collection of `PQC` tools and sample code.
 
 ---
 
-* [MLKEM](#mlkem)
 * [MLDSA](#mldsa)
   - [JWT Signature](#jwt-signature)
+* [MLKEM](#mlkem)
 * [TLS](#tls)
   - [curl](#curl)
   - [PKI](#pki)    
@@ -30,6 +30,8 @@ Digital Signatures using [ML-DSA](https://csrc.nist.gov/pubs/fips/204/final)
 * [EVP_PKEY-ML-DSA](https://github.com/openssl/openssl/blob/master/doc/man7/EVP_PKEY-ML-DSA.pod)
 
 
+Using `openssl3.5.0` (if you don't have that version, use the dockerfile below)
+
 ```bash
 openssl genpkey -algorithm ML-DSA-44  -out private.pem
 openssl pkey -in private.pem -pubout -out public.pem
@@ -37,9 +39,11 @@ openssl pkey -in private.pem -pubout -out public.pem
 echo -n "bar" > /tmp/data.in.raw
 openssl dgst -sign private.pem -out /tmp/data.out.signed /tmp/data.in.raw 
 openssl dgst -verify public.pem -signature /tmp/data.out.signed  /tmp/data.in.raw  
+```
 
+as a dockerimage using pre-generated certificates
 
-## 
+```bash
 cd mldsa/
 docker run -v /dev/urandom:/dev/urandom -v `pwd`/certs:/apps/certs -ti salrashid123/openssl-pqs:3.5.0-dev 
 
