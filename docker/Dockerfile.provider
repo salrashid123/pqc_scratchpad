@@ -1,0 +1,21 @@
+FROM debian:latest
+RUN apt-get update && apt-get install gcc build-essential git wget curl vim astyle cmake ninja-build  python3-pytest python3-pytest-xdist unzip xsltproc doxygen graphviz python3-yaml pkg-config autoconf libtool -y
+
+WORKDIR /apps
+
+RUN wget https://www.openssl.org/source/openssl-3.4.1.tar.gz && tar -xzvf openssl-3.4.1.tar.gz
+
+RUN cd openssl-3.4.1 && ./config enable-ssl-trace  && make -j`nproc` && make install
+
+RUN git clone --depth=1 https://github.com/open-quantum-safe/liboqs
+RUN cmake -S liboqs -B liboqs/build -DBUILD_SHARED_LIBS=ON && \
+    cmake --build liboqs/build --parallel 8 && \
+    cmake --build liboqs/build --target install
+
+
+RUN git clone https://github.com/open-quantum-safe/oqs-provider
+RUN cd oqs-provider && cmake -DOQS_KEM_ENCODERS=ON -S . -B _build && cmake --build _build && ctest --test-dir _build && cmake --install _build
+
+ENV LD_LIBRARY_PATH /usr/local/lib/:/usr/local/lib64/
+
+# ENTRYPOINT ["openssl"]
