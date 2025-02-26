@@ -13,7 +13,9 @@ This repo is just a collection of `PQC` tools and sample code.
 * [MLKEM](#mlkem)
 * [TLS](#tls)
   - [curl](#curl)
-  - [PKI](#pki)    
+  - [PKI](#pki)
+    - [ML-DSA](#ml-dsa)
+    - [ML-KEM](#ml-kem)
 * [Docker Images](#docker-images)
   - [Openssl 3.5.0](#openssl-350)
   - [Openssl 3.4.1 with OQSProvider](#openssl-341-with-oqsprovider)
@@ -209,12 +211,105 @@ docker run -ti openquantumsafe/curl curl -vk   https://kms.us-west-1.amazonaws.c
 
 ### PKI
 
+#### ML-DSA
+
 The certificates above uses ML-DSA signatures which you can generate using the openssl providers shown below and by specifying the scheme: [ca_scratchpad](https://github.com/salrashid123/ca_scratchpad)
 
 SLso see
 
 * [Architecting PKI Hierarchies for Graceful PQ Migration](https://pkic.org/events/2025/pqc-conference-austin-us/WED_BREAKOUT_1200_Mike-Ounsworth_Architecting-PKI-Hierarchies-for-Graceful-PQ-Migration.pdf)
 
+#### ML-KEM
+
+For `ML-KEM` you can create a certificate based on draft [Internet X.509 Public Key Infrastructure - Algorithm Identifiers for the Module-Lattice-Based Key-Encapsulation Mechanism (ML-KEM)](https://datatracker.ietf.org/doc/draft-ietf-lamps-pq-composite-kem/)
+
+```bash
+docker run -v /dev/urandom:/dev/urandom  -ti salrashid123/openssl-pqs:3.5.0-dev
+
+git clone https://github.com/salrashid123/ca_scratchpad.git
+cd ca_scratchpad
+
+mkdir -p ca/root-ca/private ca/root-ca/db crl certs
+chmod 700 ca/root-ca/private
+cp /dev/null ca/root-ca/db/root-ca.db
+cp /dev/null ca/root-ca/db/root-ca.db.attr
+
+echo 01 > ca/root-ca/db/root-ca.crt.srl
+echo 01 > ca/root-ca/db/root-ca.crl.srl
+
+export SAN=single-root-ca
+
+openssl genpkey -algorithm ML-DSA-44 \
+      -out ca/root-ca/private/root-ca.key
+
+openssl req -new  -config single-root-ca.conf  -key ca/root-ca/private/root-ca.key \
+   -out ca/root-ca.csr  
+
+openssl ca -selfsign     -config single-root-ca.conf  \
+   -in ca/root-ca.csr     -out ca/root-ca.crt  \
+   -extensions root_ca_ext
+
+# openssl genpkey  -algorithm mlkem768 -provparam ml-kem.output_formats=bare-seed  -out priv-ml-kem-768-bare-seed.pem
+# openssl pkey  -in priv-ml-kem-768-bare-seed.pem  -pubout -out pub-ml-kem-768.pem
+
+
+wget https://raw.githubusercontent.com/salrashid123/pqc_scratchpad/refs/heads/main/mlkem/certs/pub-ml-kem-768.pem
+
+cat > key.conf << EOF
+[ kem_ext ]
+keyUsage                = critical,keyEncipherment
+basicConstraints        = CA:false
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+subjectAltName          = DNS:key1.domain.com
+EOF
+
+
+openssl x509 -new -CAkey ca/root-ca/private/root-ca.key \
+   -CA ca/root-ca.crt -force_pubkey pub-ml-kem-768.pem -subj "/CN=ML-KEM Certificate" -out ml-kem.crt -extfile key.conf -extensions kem_ext
+
+openssl x509 -noout -text -in ml-kem.crt
+
+openssl x509 -pubkey -noout -in ml-kem.crt
+
+openssl asn1parse -inform PEM -in ml-kem.crt
+```
+
+This will generate an x509 like this.  Notice the signer is `ml-dsa-44` and the key is `Public Key Algorithm: ML-KEM-768`
+
+```bash
+# openssl x509 -noout -text -in ml-kem.crt
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            67:6a:d4:93:80:25:a6:d5:0b:5d:b4:0a:9e:bf:30:c7:ea:d4:96:f4
+        Signature Algorithm: ML-DSA-44
+        Issuer: C=US, O=Google, OU=Enterprise, CN=Single Root CA
+        Validity
+            Not Before: Feb 26 22:03:39 2025 GMT
+            Not After : Mar 28 22:03:39 2025 GMT
+        Subject: CN=ML-KEM Certificate
+        Subject Public Key Info:
+            Public Key Algorithm: ML-KEM-768
+                ML-KEM-768 Public-Key:
+                ek:
+                    ba:da:2d:03:99:ca:8....
+        X509v3 extensions:
+            X509v3 Key Usage: critical
+                Key Encipherment
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            X509v3 Subject Key Identifier: 
+                CF:51:CC:7C:3E:B2:B0:6D:6D:A0:2A:0F:AB:7F:7C:86:AF:84:0A:78
+            X509v3 Authority Key Identifier: 
+                FA:5A:E1:FC:76:BF:E2:D2:9D:D9:88:47:BF:33:1A:76:DA:99:BC:6E
+            X509v3 Subject Alternative Name: 
+                DNS:key1.domain.com
+    Signature Algorithm: ML-DSA-44
+    Signature Value:
+        03:2d:ea:fd:db:01:a0:a6,,,,
+```
 
 ## Docker images
 
