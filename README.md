@@ -13,7 +13,7 @@ This repo is just a collection of `PQC` tools and sample code.
 * [MLKEM](#mlkem)
 * [TLS](#tls)
   - [curl](#curl)
-  - [PKI](#pki)
+* [PKI](#pki)
     - [ML-DSA](#ml-dsa)
     - [ML-KEM](#ml-kem)
 * [Docker Images](#docker-images)
@@ -209,9 +209,9 @@ docker run -ti openquantumsafe/curl curl -vk   https://kms.us-west-1.amazonaws.c
   ## * SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384 / p384_kyber768 / RSASSA-PSS
 ```
 
-### PKI
+## PKI
 
-#### ML-DSA
+### ML-DSA
 
 The certificates above uses ML-DSA signatures which you can generate using the openssl providers shown below and by specifying the scheme see [ca_scratchpad](https://github.com/salrashid123/ca_scratchpad)
 
@@ -246,7 +246,7 @@ SLso see
 
 * [Architecting PKI Hierarchies for Graceful PQ Migration](https://pkic.org/events/2025/pqc-conference-austin-us/WED_BREAKOUT_1200_Mike-Ounsworth_Architecting-PKI-Hierarchies-for-Graceful-PQ-Migration.pdf)
 
-#### ML-KEM
+### ML-KEM
 
 For `ML-KEM` you can create a certificate based on draft [Internet X.509 Public Key Infrastructure - Algorithm Identifiers for the Module-Lattice-Based Key-Encapsulation Mechanism (ML-KEM)](https://datatracker.ietf.org/doc/draft-ietf-lamps-pq-composite-kem/)
 
