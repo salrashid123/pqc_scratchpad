@@ -213,7 +213,34 @@ docker run -ti openquantumsafe/curl curl -vk   https://kms.us-west-1.amazonaws.c
 
 #### ML-DSA
 
-The certificates above uses ML-DSA signatures which you can generate using the openssl providers shown below and by specifying the scheme: [ca_scratchpad](https://github.com/salrashid123/ca_scratchpad)
+The certificates above uses ML-DSA signatures which you can generate using the openssl providers shown below and by specifying the scheme see [ca_scratchpad](https://github.com/salrashid123/ca_scratchpad)
+
+```bash
+docker run -v /dev/urandom:/dev/urandom  -ti salrashid123/openssl-pqs:3.5.0-dev
+
+git clone https://github.com/salrashid123/ca_scratchpad.git
+cd ca_scratchpad
+
+mkdir -p ca/root-ca/private ca/root-ca/db crl certs
+chmod 700 ca/root-ca/private
+cp /dev/null ca/root-ca/db/root-ca.db
+cp /dev/null ca/root-ca/db/root-ca.db.attr
+
+echo 01 > ca/root-ca/db/root-ca.crt.srl
+echo 01 > ca/root-ca/db/root-ca.crl.srl
+
+export SAN=single-root-ca
+
+openssl genpkey -algorithm ML-DSA-44 \
+      -out ca/root-ca/private/root-ca.key
+
+openssl req -new  -config single-root-ca.conf  -key ca/root-ca/private/root-ca.key \
+   -out ca/root-ca.csr  
+
+openssl ca -selfsign     -config single-root-ca.conf  \
+   -in ca/root-ca.csr     -out ca/root-ca.crt  \
+   -extensions root_ca_ext
+```
 
 SLso see
 
