@@ -11,6 +11,7 @@ This repo is just a collection of `PQC` tools and sample code.
 * [MLDSA](#mldsa)
   - [JWT Signature](#jwt-signature)
 * [MLKEM](#mlkem)
+* [SLH-DSA](#slh-dsa)
 * [TLS](#tls)
   - [curl](#curl)
 * [PKI](#pki)
@@ -20,7 +21,7 @@ This repo is just a collection of `PQC` tools and sample code.
   - [Openssl 3.5.0](#openssl-350)
   - [Openssl 3.4.1 with OQSProvider](#openssl-341-with-oqsprovider)
   - [OpenQuantumSafe Docker images](#openquantumsafe-docker-images)
-
+openssl genpkey  --provider oqsprovider --provider default -algorithm sphincsshake128fsimple
 ---
 
 ## MLDSA
@@ -112,6 +113,23 @@ $ go run openssl_parse/main.go
   SharedSecret: kemShared (6mt5mhJ9iztKWZGpe1kdXCJv8/lxQuMpmZgvYJTWlyw=) 
 ```
 
+
+## SLH-DSA
+
+At the moment (3/7/25), its available in the opessl provider:
+
+```bash
+docker run -v /dev/urandom:/dev/urandom -ti salrashid123/openssl-pqs:3.5.0-oqsprovider
+
+ openssl list -signature-algorithms --provider oqsprovider
+
+ openssl genpkey  --provider oqsprovider --provider default -algorithm sphincssha2128ssimple  -out private.pem
+ openssl pkey --provider oqsprovider --provider default -in private.pem -pubout -out public.pem
+
+ echo -n "bar" > /tmp/data.in.raw
+ openssl dgst  --provider oqsprovider --provider default -sign private.pem -out /tmp/data.out.signed /tmp/data.in.raw 
+ openssl dgst  --provider oqsprovider --provider default -verify public.pem -signature /tmp/data.out.signed  /tmp/data.in.raw   
+```
 
 ## TLS
 
