@@ -21,7 +21,7 @@ This repo is just a collection of `PQC` tools and sample code.
   - [Openssl 3.5.0](#openssl-350)
   - [Openssl 3.4.1 with OQSProvider](#openssl-341-with-oqsprovider)
   - [OpenQuantumSafe Docker images](#openquantumsafe-docker-images)
-openssl genpkey  --provider oqsprovider --provider default -algorithm sphincsshake128fsimple
+
 ---
 
 ## MLDSA
