@@ -9,7 +9,7 @@ import (
 	"log"
 
 	"github.com/cloudflare/circl/pki"
-	"github.com/cloudflare/circl/sign/mldsa/mldsa44"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
 )
 
 const ()
@@ -19,7 +19,7 @@ var ()
 func main() {
 	flag.Parse()
 
-	ppu, ppr, err := mldsa44.GenerateKey(rand.Reader)
+	ppu, ppr, err := mldsa65.GenerateKey(rand.Reader)
 	if err != nil {
 		panic(err)
 	}
@@ -45,7 +45,7 @@ func main() {
 	}
 	log.Printf("Signature %s", base64.StdEncoding.EncodeToString(sig))
 
-	ok := mldsa44.Verify(ppu, data, nil, sig)
+	ok := mldsa65.Verify(ppu, data, nil, sig)
 	if !ok {
 		log.Printf("Error verifying")
 	}

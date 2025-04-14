@@ -157,6 +157,62 @@ Verified OK
 
 ```
 
+
+#### PEM Key conversion
+
+Tje `key_comapt/` example generates a public/private key pair in golang and converts the PEM files into the format openssl understands.
+
+THis is just a temp hack to account for  [issue#535:openssl parsing compatiblity issue for MLDSA](https://github.com/cloudflare/circl/issues/535)
+
+eg, starting with,
+
+```bash
+$ go run key_compat/main.go
+$ docker run -v /dev/urandom:/dev/urandom -v `pwd`/certs:/apps/certs -ti salrashid123/openssl-pqs:3.5.0-dev 
+
+$ openssl asn1parse -inform PEM -in certs/ml-dsa-65-public.pem 
+    0:d=0  hl=4 l=1969 cons: SEQUENCE          
+    4:d=1  hl=2 l=  10 cons: SEQUENCE          
+    6:d=2  hl=2 l=   8 prim: OBJECT            :2.16.840.1.101.3.4.18
+   16:d=1  hl=4 l=1953 prim: BIT STRING       
+
+$ openssl asn1parse -inform PEM -in certs/ml-dsa-65-private.pem 
+    0:d=0  hl=4 l=4055 cons: SEQUENCE          
+    4:d=1  hl=2 l=   1 prim: INTEGER           :00
+    7:d=1  hl=2 l=  10 cons: SEQUENCE          
+    9:d=2  hl=2 l=   8 prim: OBJECT            :2.16.840.1.101.3.4.18
+   19:d=1  hl=4 l=4036 prim: OCTET STRING      [HEX DUMP]:04820FC02D84F5
+
+$ openssl asn1parse -inform PEM -in certs/public_compat.pem 
+    0:d=0  hl=4 l=1970 cons: SEQUENCE          
+    4:d=1  hl=2 l=  11 cons: SEQUENCE          
+    6:d=2  hl=2 l=   9 prim: OBJECT            :ML-DSA-65
+   17:d=1  hl=4 l=1953 prim: BIT STRING     
+
+$ openssl asn1parse -inform PEM -in certs/private_compat.pem 
+    0:d=0  hl=4 l=4052 cons: SEQUENCE          
+    4:d=1  hl=2 l=   1 prim: INTEGER           :00
+    7:d=1  hl=2 l=  11 cons: SEQUENCE          
+    9:d=2  hl=2 l=   9 prim: OBJECT            :ML-DSA-65
+   20:d=1  hl=4 l=4032 prim: OCTET STRING      [HEX DUMP]:2D84F56645A...
+```
+
+then sign and verify with openssl
+
+```bash
+echo -n "bar" > /tmp/data.in.raw
+# openssl dgst -sign certs/ml-dsa-65-private.pem -out /tmp/data.out.signed /tmp/data.in.raw 
+#    Could not find private key from certs/ml-dsa-65-private.pem
+
+openssl dgst -sign certs/private_compat.pem -out /tmp/data.out.signed /tmp/data.in.raw 
+# openssl dgst -verify certs/ml-dsa-65-public.pem -signature /tmp/data.out.signed  /tmp/data.in.raw  
+  # Could not find private key of public key from certs/ml-dsa-65-public.pem
+  # 808B1DA0D37F0000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:152:
+
+openssl dgst -verify certs/public_compat.pem -signature /tmp/data.out.signed  /tmp/data.in.raw  
+Verified OK
+```
+
 ## MLKEM
 
 Key Encapsulation [ML-KEM](https://csrc.nist.gov/pubs/fips/203/final)
