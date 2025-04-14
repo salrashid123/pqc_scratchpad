@@ -134,7 +134,7 @@ func main() {
 
 		sharedKey, err := dk.Decapsulate(cipherText)
 		if err != nil {
-			panci(err)
+			panic(err)
 		}
 		fmt.Printf("SharedSecret: kemShared (%s) \n", base64.StdEncoding.EncodeToString(sharedKey))
 	}

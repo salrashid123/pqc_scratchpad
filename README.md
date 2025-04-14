@@ -157,7 +157,6 @@ Verified OK
 
 ```
 
-
 #### PEM Key conversion
 
 Tje `key_comapt/` example generates a public/private key pair in golang and converts the PEM files into the format openssl understands.
@@ -253,6 +252,46 @@ $ go run openssl_parse/main.go
   SharedSecret: kemShared (6mt5mhJ9iztKWZGpe1kdXCJv8/lxQuMpmZgvYJTWlyw=) 
 ```
 
+#### PEM Key Conversion
+
+The following will generate a new keypair using go mlkem package and write the keys to a file.
+
+Note that we're writing the **seed only** as the private key
+
+```bash
+$ go run default/main.go
+$ docker run -v /dev/urandom:/dev/urandom -v `pwd`/certs:/apps/certs -ti salrashid123/openssl-pqs:3.5.0-dev 
+
+$ openssl asn1parse -in certs/pub-ml-kem-768.pem 
+    0:d=0  hl=4 l=1202 cons: SEQUENCE          
+    4:d=1  hl=2 l=  11 cons: SEQUENCE          
+    6:d=2  hl=2 l=   9 prim: OBJECT            :ML-KEM-768
+   17:d=1  hl=4 l=1185 prim: BIT STRING        
+
+$ openssl asn1parse -in certs/priv-ml-kem-768.pem 
+    0:d=0  hl=4 l=2494 cons: SEQUENCE          
+    4:d=1  hl=2 l=   1 prim: INTEGER           :00
+    7:d=1  hl=2 l=  11 cons: SEQUENCE          
+    9:d=2  hl=2 l=   9 prim: OBJECT            :ML-KEM-768
+   20:d=1  hl=4 l=2474 prim: OCTET STRING      [HEX DUMP]:308209A6044067E6BC81C8468080....
+
+$ openssl asn1parse -in certs/private.pem         
+    0:d=0  hl=2 l=  82 cons: SEQUENCE          
+    2:d=1  hl=2 l=   1 prim: INTEGER           :00
+    5:d=1  hl=2 l=  11 cons: SEQUENCE          
+    7:d=2  hl=2 l=   9 prim: OBJECT            :ML-KEM-768
+   18:d=1  hl=2 l=  64 prim: OCTET STRING      [HEX DUMP]:D7A99DF3E70F7281...
+
+## encapsulate with public key
+openssl pkeyutl -encap -inkey certs/private.pem  -secret /tmp/encap.dat -out /tmp/ctext.dat
+
+## print shared key
+cat /tmp/encap.dat | xxd -p -c 100
+  ca08986c403dec7505bfcb214ad53c9a9af24d1547f5c87f74b785699b7eb94c
+
+openssl pkeyutl -decap -inkey certs/private.pem  -in /tmp/ctext.dat | xxd -p -c 100
+  ca08986c403dec7505bfcb214ad53c9a9af24d1547f5c87f74b785699b7eb94c   
+```
 
 ## SLH-DSA
 
