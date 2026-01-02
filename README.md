@@ -219,6 +219,10 @@ Key Encapsulation [ML-KEM](https://csrc.nist.gov/pubs/fips/203/final)
 * [Internet X.509 Public Key Infrastructure - Algorithm Identifiers for the Module-Lattice-Based Key-Encapsulation Mechanism (ML-KEM)](https://datatracker.ietf.org/doc/draft-ietf-lamps-kyber-certificates/08/)
 * [EVP_PKEY-ML-KEM](https://github.com/openssl/openssl/blob/master/doc/man7/EVP_PKEY-ML-KEM.pod)
 
+
+* [AEAD encryption using Post Quantum Cryptography (ML-KEM)](https://github.com/salrashid123/go-pqc-wrapping)
+* [Generate MLKEM key using Trusted Platfrom Module as random number generator](https://gist.github.com/salrashid123/761101aa94e9b26b114390fd966b1358)
+
 ```bash
 ## generate a key as 'seed-only'
 openssl genpkey  -algorithm mlkem768 -provparam ml-kem.output_formats=bare-seed  -out priv-ml-kem-768-bare-seed.pem
