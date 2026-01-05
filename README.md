@@ -12,6 +12,7 @@ This repo is just a collection of `PQC` tools and sample code.
   - [JWT Signature](#jwt-signature)
   - [Google Cloud KMS PQC signature verification](#google-cloud-kms-pqc-signature-verification)  
 * [MLKEM](#mlkem)
+  - [PEM Key Conversion](#pem-key-conversion)
 * [SLH-DSA](#slh-dsa)
 * [TLS](#tls)
   - [curl](#curl)
@@ -212,6 +213,9 @@ openssl dgst -verify certs/public_compat.pem -signature /tmp/data.out.signed  /t
 Verified OK
 ```
 
+Also see the [mlkem/python/](mlkem/python/) folder for example on using python to convert keys to and from openssl's PEM format.  You can find go examples [here](https://github.com/salrashid123/go-pqc-wrapping/tree/main/example/util)
+
+
 ## MLKEM
 
 Key Encapsulation [ML-KEM](https://csrc.nist.gov/pubs/fips/203/final)
@@ -221,7 +225,13 @@ Key Encapsulation [ML-KEM](https://csrc.nist.gov/pubs/fips/203/final)
 
 
 * [AEAD encryption using Post Quantum Cryptography (ML-KEM)](https://github.com/salrashid123/go-pqc-wrapping)
+* [Python AEAD encryption using Post Quantum Cryptography (ML-KEM)](https://github.com/salrashid123/python_pqc_wrapping)
 * [Generate MLKEM key using Trusted Platfrom Module as random number generator](https://gist.github.com/salrashid123/761101aa94e9b26b114390fd966b1358)
+
+ For reference the basic flow is described here in [FIPS 203 (page 12)](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.203.pdf)
+
+![images/key_exchange.png](images/key_exchange.png)
+
 
 ```bash
 ## generate a key as 'seed-only'
@@ -296,6 +306,125 @@ cat /tmp/encap.dat | xxd -p -c 100
 openssl pkeyutl -decap -inkey certs/private.pem  -in /tmp/ctext.dat | xxd -p -c 100
   ca08986c403dec7505bfcb214ad53c9a9af24d1547f5c87f74b785699b7eb94c   
 ```
+
+##### Read PEM keys with Python
+
+The [mlkem/python](mlkem/python/) folder contains a sample to read the PEM files directly in python
+
+Note, only `bare-seed` PEM private keys are supported
+
+```bash
+#### https://github.com/open-quantum-safe/liboqs-python
+virtualenv env 
+source env/bin/activate 
+pip3 install pem asn1tools
+git clone --depth=1 https://github.com/open-quantum-safe/liboqs-python
+cd liboqs-python
+pip install .
+
+
+$ python3 kem_key_parser.py 
+liboqs-python faulthandler is disabled
+Decoded PrivateKeyInfo:
+bare seed from pem private key 67e6bc81c846808002ced71bbf8a8c4195af2a37614c4c81c0b649601b29beaa33cbff214a0dc459749362c8b3d4dd7c754a0d611d51d3449c2fa47c1dc49c5e
+Decoded subjectPublicKey:
+Shared secretes coincide: True
+
+```
+
+
+##### Openssl key formats
+
+Openssl PEM files encodes a custom 'format' prefix as shown [here](hhttps://github.com/openssl/openssl/blob/master/providers/implementations/encode_decode/ml_kem_codecs.c#L92) Which diverges from IETF's direction
+
+* [OpenSSL Position and Plans on Private Key Formats for the ML-KEM and ML-DSA Post-quantum (PQ) Algorithms](https://openssl-library.org/post/2025-01-21-blog-positionandplans/)
+* [Let’s All Agree to Use Seeds as ML-KEM Keys](https://words.filippo.io/ml-kem-seeds/)
+
+For example, if you generated the key with a `seed-only`, the PEM file will have a prefix of `0x8040` for the raw key:
+
+```bash
+$  openssl asn1parse -inform PEM -in  example/certs/bare-seed-768.pem 
+    0:d=0  hl=2 l=  82 cons: SEQUENCE          
+    2:d=1  hl=2 l=   1 prim: INTEGER           :00
+    5:d=1  hl=2 l=  11 cons: SEQUENCE          
+    7:d=2  hl=2 l=   9 prim: OBJECT            :ML-KEM-768
+   18:d=1  hl=2 l=  64 prim: OCTET STRING      [HEX DUMP]:67E6BC81C846808002CED71BBF8A8C4195AF2A37614C4C81C0B649601B29BEAA33CBFF214A0DC459749362C8B3D4DD7C754A0D611D51D3449C2FA47C1DC49C5E
+
+$  openssl asn1parse -inform PEM -in  example/certs/seed-only-768.pem 
+    0:d=0  hl=2 l=  84 cons: SEQUENCE          
+    2:d=1  hl=2 l=   1 prim: INTEGER           :00
+    5:d=1  hl=2 l=  11 cons: SEQUENCE          
+    7:d=2  hl=2 l=   9 prim: OBJECT            :ML-KEM-768
+   18:d=1  hl=2 l=  66 prim: OCTET STRING      [HEX DUMP]:804067E6BC81C846808002CED71BBF8A8C4195AF2A37614C4C81C0B649601B29BEAA33CBFF214A0DC459749362C8B3D4DD7C754A0D611D51D3449C2FA47C1DC49C5E
+```
+
+For a list of all prefixes:
+
+```cpp
+static const ML_COMMON_PKCS8_FMT ml_kem_768_p8fmt[NUM_PKCS8_FORMATS] = {
+    { "seed-priv",  0x09aa, 0, 0x308209a6, 0x0440, 6, 0x40, 0x04820960, 0x4a, 0x0960, 0,      0,     },
+    { "priv-only",  0x0964, 0, 0x04820960, 0,      0, 0,    0,          0x04, 0x0960, 0,      0,     },
+    { "oqskeypair", 0x0e04, 0, 0x04820e00, 0,      0, 0,    0,          0x04, 0x0960, 0x0964, 0x04a0 },
+    { "seed-only",  0x0042, 2, 0x8040,     0,      2, 0x40, 0,          0,    0,      0,      0,     },
+    { "bare-priv",  0x0960, 4, 0,          0,      0, 0,    0,          0,    0x0960, 0,      0,     },
+    { "bare-seed",  0x0040, 4, 0,          0,      0, 0x40, 0,          0,    0,      0,      0,     },
+};
+```
+
+Note, you can extract the `seed` from a key using openssl:
+
+```bash
+$ openssl pkey -in example/certs/seed-only-768.pem -text          
+      ML-KEM-768 Private-Key:
+      seed:
+         67:e6:bc:81:c8:46:80:80:02:ce:d7:1b:bf:8a:8c:
+         41:95:af:2a:37:61:4c:4c:81:c0:b6:49:60:1b:29:
+         be:aa:33:cb:ff:21:4a:0d:c4:59:74:93:62:c8:b3:
+         d4:dd:7c:75:4a:0d:61:1d:51:d3:44:9c:2f:a4:7c:
+         1d:c4:9c:5e
+```
+
+Which as hex is `67E6BC81C846808002CED71BBF8A8C4195AF2A37614C4C81C0B649601B29BEAA33CBFF214A0DC459749362C8B3D4DD7C754A0D611D51D3449C2FA47C1DC49C5E`
+
+Since in go we'd ultimately need the  the `bare-seed` key, you'll need to convert it
+
+```bash
+## create a key with default seed-priv (implicitly by default or by specifying  ml-kem.output_formats )
+openssl genpkey  -algorithm mlkem768   -out priv-ml-kem-768-seed-priv.pem
+openssl asn1parse -in priv-ml-kem-768-seed-priv.pem
+
+openssl genpkey  -algorithm mlkem768 \
+   -provparam ml-kem.output_formats=seed-priv \
+   -out priv-ml-kem-768-seed-priv.pem
+openssl asn1parse -in priv-ml-kem-768-seed-priv.pem
+
+## print the  seed
+openssl pkey -in priv-ml-kem-768-seed-priv.pem -text  
+
+   ML-KEM-768 Private-Key:
+   seed:
+      bf:bd:29:76:bd:01:87:e3:75:0e:5c:46:4e:fc:e0:
+      5a:0a:b6:ca:0a:b4:0c:f7:c4:90:08:1b:54:83:1f:
+      12:18:25:50:15:7f:49:e0:24:7b:92:b7:b9:b2:de:
+      49:21:74:53:71:9a:81:71:c6:cd:15:83:23:da:d2:
+      c6:6d:ef:2b
+
+### now convert
+openssl pkey -in priv-ml-kem-768-seed-priv.pem \
+   -provparam ml-kem.output_formats=bare-seed \
+   -out priv-ml-kem-768-bare-seed.pem
+
+### and veify the seed is the same
+openssl pkey -in priv-ml-kem-768-bare-seed.pem -text
+   ML-KEM-768 Private-Key:
+   seed:
+      bf:bd:29:76:bd:01:87:e3:75:0e:5c:46:4e:fc:e0:
+      5a:0a:b6:ca:0a:b4:0c:f7:c4:90:08:1b:54:83:1f:
+      12:18:25:50:15:7f:49:e0:24:7b:92:b7:b9:b2:de:
+      49:21:74:53:71:9a:81:71:c6:cd:15:83:23:da:d2:
+      c6:6d:ef:2b
+```
+
 
 ## SLH-DSA
 
