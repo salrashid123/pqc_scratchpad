@@ -33,45 +33,45 @@ wrote issued.pem
 
 $ cat issued.pem 
 -----BEGIN CERTIFICATE-----
-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
-eKwabYxlXu798cuwhg==
+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
+ZmI0lQBa3eMu6TeX4qA=
 -----END CERTIFICATE-----
 ```
 
@@ -79,8 +79,6 @@ eKwabYxlXu798cuwhg==
 you can verify it using openssl which support pqs like this docker file.    
 
 Notice the certificate's `Public Key Algorithm: ML-KEM-768` and that when we extract the publicKey, its the same as what the MLKEM Public we embeeded in the go program.
-
-
 
 ```bash
 docker run -v /dev/urandom:/dev/urandom  -ti salrashid123/openssl-pqs:3.5.0-dev
@@ -92,15 +90,15 @@ Certificate:
     Data:
         Version: 3 (0x2)
         Serial Number:
-            7b:84:59:a2:43:46:fd:5c:d5:ae:0d:af:35:97:77:a1
+            c4:06:54:ad:d4:f5:6e:4f:7f:f5:eb:8e:00:76:49:91
         Signature Algorithm: sha256WithRSAEncryption
         Issuer: C=US, O=Google, OU=Enterprise, CN=Single Root CA
         Validity
-            Not Before: Jan  6 12:49:45 2026 GMT
-            Not After : Jan  6 12:49:45 2027 GMT
+            Not Before: Jan  6 14:33:16 2026 GMT
+            Not After : Jan  6 14:33:16 2027 GMT
         Subject: C=US, ST=California, L=Mountain View, O=Acme Co, OU=Enterprise, CN=mycn
         Subject Public Key Info:
-            Public Key Algorithm: ML-KEM-768  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            Public Key Algorithm: ML-KEM-768  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                 ML-KEM-768 Public-Key:
                 ek:
                     ba:da:2d:03:99:ca:81:63:2b:ba:c3:7b:56:f4:01:
@@ -184,7 +182,7 @@ Certificate:
                     2b:14:0e:ff:58:b3:13:64:59:5a:0d:41:02:c5
         X509v3 extensions:
             X509v3 Key Usage: critical
-                Digital Signature, Non Repudiation
+                Key Encipherment                    <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
             X509v3 Basic Constraints: critical
                 CA:FALSE
             X509v3 Authority Key Identifier: 
@@ -193,21 +191,21 @@ Certificate:
                 DNS:mysni
     Signature Algorithm: sha256WithRSAEncryption
     Signature Value:
-        6b:b9:83:67:3f:36:a2:79:f4:49:77:f0:15:9c:d3:f2:2f:2d:
-        a5:61:ba:b6:69:a4:0c:2b:f7:a7:a6:e0:c4:85:d7:2c:66:dc:
-        d6:12:7d:d1:ac:91:e1:10:b3:86:29:8e:c3:cf:8c:e7:66:f2:
-        47:71:1d:8e:ae:97:17:64:43:09:d1:75:df:27:23:87:38:e7:
-        be:10:a8:ae:2d:bf:d4:7e:62:97:0c:67:c5:91:20:ef:b3:d9:
-        5f:e1:94:19:40:85:6a:dd:9f:88:b1:73:f5:f1:a8:dc:d3:03:
-        6b:ab:e2:92:17:e1:b2:8d:0d:29:63:0d:82:e5:d9:5d:11:02:
-        45:a8:51:04:1f:84:98:d0:8c:7f:ac:01:9f:c1:15:0e:a8:91:
-        c3:b5:fa:ed:97:eb:60:43:76:55:fb:02:bf:8f:94:4a:89:11:
-        7b:1e:8b:44:b9:8a:67:53:8e:ef:8f:e0:41:7a:cc:56:75:0f:
-        c6:47:8a:66:54:d1:fb:fc:b5:c5:26:11:84:f2:8a:f6:92:d5:
-        0f:d9:64:09:bd:14:b0:89:d1:82:cf:82:6e:3a:cb:e8:33:9f:
-        41:87:bf:4b:12:06:40:46:ea:ac:0e:0f:9f:aa:77:67:aa:a1:
-        76:f3:25:80:fe:ef:20:c8:eb:78:ac:1a:6d:8c:65:5e:ee:fd:
-        f1:cb:b0:86
+        6d:81:a3:32:04:f4:06:e9:96:fd:90:44:59:c4:1c:16:f3:59:
+        ea:5b:ea:5f:96:a6:e0:42:c6:2a:c2:8e:d5:33:c8:bd:24:9d:
+        d3:34:0e:98:36:29:1c:06:7f:13:37:d6:01:7d:58:82:87:22:
+        ef:09:0a:40:9e:e6:0a:37:45:de:43:78:90:f3:8c:6b:2c:69:
+        fa:a4:92:dd:de:ea:04:22:66:b6:9b:33:95:53:f2:48:cb:a6:
+        bd:ff:6b:c9:55:e6:88:60:e0:c4:88:aa:a1:f3:0a:28:41:11:
+        a6:e6:f7:8d:81:7e:bb:a3:5d:5a:b2:cd:e2:08:47:b2:6b:83:
+        4c:5f:62:99:c8:87:80:31:80:4c:81:2d:56:a9:8e:de:db:af:
+        a1:7e:d4:36:09:a6:b1:33:12:e3:c2:ca:e0:2c:0b:45:df:e3:
+        c7:d8:94:52:49:97:9c:aa:24:4e:17:d4:73:3b:a8:c3:79:6a:
+        72:f0:72:d2:83:e7:63:20:0d:2b:01:87:e2:e4:af:ad:14:32:
+        a5:c2:ea:5b:5d:6d:80:50:2b:d1:7c:fe:2e:e1:57:74:a9:da:
+        50:8c:a5:3a:2b:20:eb:4f:6d:88:46:a8:52:30:bc:c2:e4:62:
+        ef:f3:aa:7f:53:85:cb:b0:66:62:34:95:00:5a:dd:e3:2e:e9:
+        37:97:e2:a0
 
 
 openssl x509 -pubkey -noout -in issued.pem 

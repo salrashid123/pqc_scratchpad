@@ -253,7 +253,7 @@ func main() {
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
 		DNSNames:              []string{"mysni"},
-		KeyUsage:              x509.KeyUsage(x509.ExtKeyUsageCodeSigning),
+		KeyUsage:              x509.KeyUsage(x509.KeyUsageKeyEncipherment),
 		ExtKeyUsage:           []x509.ExtKeyUsage{},
 		BasicConstraintsValid: true,
 		IsCA:                  false,
