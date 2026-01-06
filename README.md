@@ -580,6 +580,8 @@ SLso see
 
 For `ML-KEM` you can create a certificate based on draft [Internet X.509 Public Key Infrastructure - Algorithm Identifiers for the Module-Lattice-Based Key-Encapsulation Mechanism (ML-KEM)](https://datatracker.ietf.org/doc/draft-ietf-lamps-pq-composite-kem/)
 
+For golang see [mlkem/issue_cert/](mlkem/issue_cert/)
+
 ```bash
 docker run -v /dev/urandom:/dev/urandom  -ti salrashid123/openssl-pqs:3.5.0-dev
 

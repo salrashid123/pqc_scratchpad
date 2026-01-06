@@ -1,0 +1,65 @@
+diff --git a/src/crypto/x509/x509.go b/src/crypto/x509/x509.go
+index 1f06b4fbc5..4daf6a5ffd 100644
+--- a/src/crypto/x509/x509.go
++++ b/src/crypto/x509/x509.go
+@@ -132,6 +132,9 @@ func marshalPublicKey(pub any) (publicKeyBytes []byte, publicKeyAlgorithm pkix.A
+ 			}
+ 			publicKeyAlgorithm.Parameters.FullBytes = paramBytes
+ 		}
++	case MLKEMPublicKeyInfo:
++		publicKeyBytes = pub.PublicKey.Bytes
++		publicKeyAlgorithm.Algorithm = oidPublicKeyMLKEM768
+ 	default:
+ 		return nil, pkix.AlgorithmIdentifier{}, fmt.Errorf("x509: unsupported public key type: %T", pub)
+ 	}
+@@ -199,6 +202,12 @@ type validity struct {
+ 	NotBefore, NotAfter time.Time
+ }
+ 
++type MLKEMPublicKeyInfo struct {
++	Raw       asn1.RawContent
++	Algorithm pkix.AlgorithmIdentifier
++	PublicKey asn1.BitString
++}
++
+ type publicKeyInfo struct {
+ 	Raw       asn1.RawContent
+ 	Algorithm pkix.AlgorithmIdentifier
+@@ -268,13 +277,15 @@ const (
+ 	DSA // Only supported for parsing.
+ 	ECDSA
+ 	Ed25519
++	MLKEM768
+ )
+ 
+ var publicKeyAlgoName = [...]string{
+-	RSA:     "RSA",
+-	DSA:     "DSA",
+-	ECDSA:   "ECDSA",
+-	Ed25519: "Ed25519",
++	RSA:      "RSA",
++	DSA:      "DSA",
++	ECDSA:    "ECDSA",
++	Ed25519:  "Ed25519",
++	MLKEM768: "ML-KEM-768",
+ }
+ 
+ func (algo PublicKeyAlgorithm) String() string {
+@@ -492,6 +503,8 @@ var (
+ 	//	id-Ed25519   OBJECT IDENTIFIER ::= { 1 3 101 112 }
+ 	oidPublicKeyX25519  = asn1.ObjectIdentifier{1, 3, 101, 110}
+ 	oidPublicKeyEd25519 = asn1.ObjectIdentifier{1, 3, 101, 112}
++
++	oidPublicKeyMLKEM768 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 2}
+ )
+ 
+ // getPublicKeyAlgorithmFromOID returns the exposed PublicKeyAlgorithm
+@@ -507,6 +520,8 @@ func getPublicKeyAlgorithmFromOID(oid asn1.ObjectIdentifier) PublicKeyAlgorithm
+ 		return ECDSA
+ 	case oid.Equal(oidPublicKeyEd25519):
+ 		return Ed25519
++	case oid.Equal(oidPublicKeyMLKEM768):
++		return MLKEM768
+ 	}
+ 	return UnknownPublicKeyAlgorithm
+ }
