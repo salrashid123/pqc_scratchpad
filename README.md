@@ -32,6 +32,7 @@ shamless plug by the author
 * [Python AEAD encryption using Post Quantum Cryptography (ML-KEM)](https://github.com/salrashid123/python_pqc_wrapping)
 * [golang-jwt for post quantum cryptography](https://github.com/salrashid123/golang-jwt-pqc)
 * [OCICrypt Container Image Post Quantum Cryptography Provider](https://github.com/salrashid123/ocicrypt-pqc-keyprovider)
+* [Generate MLKEM key using Trusted Platfrom Module as random number generator](https://gist.github.com/salrashid123/761101aa94e9b26b114390fd966b1358)
 
 ---
 
