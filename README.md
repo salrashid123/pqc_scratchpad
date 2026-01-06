@@ -26,12 +26,21 @@ This repo is just a collection of `PQC` tools and sample code.
 
 ---
 
+shamless plug by the author
+
+* [AEAD encryption using Post Quantum Cryptography (ML-KEM)](https://github.com/salrashid123/go-pqc-wrapping)
+* [Python AEAD encryption using Post Quantum Cryptography (ML-KEM)](https://github.com/salrashid123/python_pqc_wrapping)
+* [golang-jwt for post quantum cryptography](https://github.com/salrashid123/golang-jwt-pqc)
+* [OCICrypt Container Image Post Quantum Cryptography Provider](https://github.com/salrashid123/ocicrypt-pqc-keyprovider)
+
+---
+
 ## MLDSA
 
 Digital Signatures using [ML-DSA](https://csrc.nist.gov/pubs/fips/204/final)
 
 * [Internet X.509 Public Key Infrastructure: Algorithm Identifiers for ML-DSA](https://datatracker.ietf.org/doc/draft-ietf-lamps-dilithium-certificates/)
-* [https://datatracker.ietf.org/doc/draft-ietf-lamps-pq-composite-sigs/](Composite ML-DSA For use in X.509 Public Key Infrastructure and CMS)
+* [Composite ML-DSA For use in X.509 Public Key Infrastructure and CMS](https://datatracker.ietf.org/doc/draft-ietf-lamps-pq-composite-sigs/)
 * [EVP_PKEY-ML-DSA](https://github.com/openssl/openssl/blob/master/doc/man7/EVP_PKEY-ML-DSA.pod)
 
 
