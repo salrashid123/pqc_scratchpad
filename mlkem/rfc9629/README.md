@@ -13,25 +13,43 @@ the code here does the following
 
 to encrypt  `payload_text` for the receiver
 
-1. receiver: read in a CA certificate and key
-2. receiver: generate an ml keypair (`kemPriv`, `kemPub`)
-3. receiver; create an x509 certificate where the public key is kemPub
-4. receiver: sign the certificte by the ca
-5. receiver->sender: send the  x509
-6. sender: verify the certificate is signed by the trusted ca
-6. sender: extract the kem public key
+`receiver`
 
-7. sender: verify the parameters in the certificate (issuer, public key (kemPub), spi)
-8. sender: generate a random `payload_encryption_key` and `payload_encryption_nonce`
-9. sender: `encrypted_payload = aes.Seal( plaintext=payload_text, key=payload_encryption_key, nonce=payload_encryption_nonce )`
+1. `receiver`: read in a CA certificate and key
+2. `receiver`: generate an ml keypair (`kemPriv`, `kemPub`)
+3. `receiver`; create an x509 certificate where the public key is `kemPub`
+4. `receiver`: sign the certificte by the ca
+5. `receiver`->sender: send the  x509
 
-10. sender: `sharedSecret, kemcipherText = kem.Encapsulate( kemPub )`
-11: sender: generate a `kdf_nonce`
-12. sender: `kek_derived_key = kdf( nonce=kdf_nonce, ikm=sharedSecret )`
+---
 
-13. sender: generate `kek_nonce`
-14. sender: `encrypted_key = aes.Seal( plaintext=payload_encryption_key, key=kek_derived_key, nonce=kek_nonce )`
-15. sender: generate the `KEMRecipientInfo` and encode to pem or der
+`sender`
+
+6. `sender`: verify the certificate is signed by the trusted ca
+7. `sender`: extract the kem public key
+
+8. `sender`: verify the parameters in the certificate (issuer, public key (kemPub), spi)
+9. `sender`: generate a random `payload_encryption_key` and `payload_encryption_nonce`
+10. `sender`:
+
+   `encrypted_payload = aes.Seal( plaintext=payload_text, key=payload_encryption_key, nonce=payload_encryption_nonce )`
+
+11. `sender`:
+
+    `sharedSecret, kemcipherText = kem.Encapsulate( kemPub )`
+    
+12: `sender`: generate a `kdf_nonce`
+
+13. `sender`:
+
+    `kek_derived_key = kdf( nonce=kdf_nonce, ikm=sharedSecret )`
+
+14. `sender`: generate `kek_nonce`
+15. `sender`:
+ 
+      `encrypted_key = aes.Seal( plaintext=payload_encryption_key, key=kek_derived_key, nonce=kek_nonce )`
+
+16. `sender`: generate the `KEMRecipientInfo` and encode to pem or der
 
 ```golang
 type KEMRecipientInfo struct {
@@ -47,7 +65,7 @@ type KEMRecipientInfo struct {
 }
 ```
 
-16. Generate `CMS` using the following chain
+17. Generate `CMS` using the following chain
 
 ```golang
 type RecipientInfo struct {
@@ -86,14 +104,19 @@ ContentInfo{
 ```
 
 
-17. sender->receiver: send the pem or der
-18. receiver decodes ContentInfo and extracts 
+18. `sender`->`receiver`: send the pem or der
+
+---
+
+`receiver`
+
+19. `receiver` decodes ContentInfo and extracts 
 
   `(encrypted_payload, payload_encryption_nonce)`  // from `ContentInfo.EnvelopedData.ECI` 
 
   `(encrypted_key, kek_nonce, kdf_nonce, kemcipherText )`  // from  `ContentInfo.EnvelopedData.RecipientInfos[0].(KEMRecipientInfo)`
 
-19. reverse the ecryption by the sender 
+20. reverse the ecryption by the sender 
    
     `sharedSecret = kem.Decapsulate( kemcipherText, key=kemPriv )`
 
@@ -102,6 +125,8 @@ ContentInfo{
     `payload_encryption_key = aes_gcm.open( key=derived_key, ciphertext=encrypted_key, nonce=kek_nonce )`
 
     `payload_text = aes_gcm.open( key=payload_encryption_key, ciphertext=encrypted_payload, nonce=payload_encryption_nonce )`
+
+---
 
 ```bash
 $ go run main.go 
