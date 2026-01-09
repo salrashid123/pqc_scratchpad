@@ -356,6 +356,8 @@ openssl pkey -in priv-ml-kem-768-bare-seed.pem -text
       c6:6d:ef:2b
 ```
 
+This repo also contains an unsupported guess at what [rfc9629](https://www.rfc-editor.org/rfc/rfc9629.html) looks like
+
 ##### Read PEM keys with Python
 
 The [mlkem/python](mlkem/python/) folder contains a sample to read the PEM files directly in python
