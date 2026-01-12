@@ -24,28 +24,32 @@ import (
 	"math/big"
 	"time"
 
+	keywrap "github.com/nickball/go-aes-key-wrap"
 	"golang.org/x/crypto/hkdf"
 )
 
 const ()
 
 var (
-	mlkem758OID      = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 2}
-	OID_HKDF_SHA256  = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 3, 28}
-	OID_AES_GCM_256  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 46}
-	AES256Wrap       = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 45}
-	OIDEnvelopedData = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 3}
+
+	//OID_MLKEM512 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 1}
+	OID_MLKEM768 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 2}
+
+	OID_AES_GCM_256 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 46}
+	OID_AES_GCM_128 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 6}
+
+	OID_AES_128_KEYWRAP = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 5}
+
+	OID_EnvelopedData = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 3}
 
 	OID_KEMRecipientInfo = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 13, 3}
-
 	// Content type OIDs
 
-	Data       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}
-	SignedData = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2}
+	OID_HKDF_SHA256 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 3, 28}
 
-	AuthEnvelopedData  = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 1, 23}
-	TSTInfo            = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 1, 4}
-	ContentTypeTSTInfo = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 1, 4}
+	OID_PKCS7_DATA = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}
+
+	OID_AUTH_AuthEnvelopedData = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 1, 23}
 )
 
 //	EnvelopedData ::= SEQUENCE {
@@ -56,10 +60,31 @@ var (
 //		unprotectedAttrs [1] IMPLICIT UnprotectedAttributes OPTIONAL }
 type EnvelopedData struct {
 	Version          int
-	OriginatorInfo   asn1.RawValue        `asn1:"optional,implicit,tag:0"`
-	RecipientInfos   RecipientInfo        `asn1:"set,implicit"`
+	OriginatorInfo   asn1.RawValue        `asn1:"optional,tag:0"`
+	RecipientInfos   []RecipientInfo      `asn1:"set,choice"`
 	ECI              EncryptedContentInfo ``
 	UnprotectedAttrs []Attribute          `asn1:"set,optional,tag:1"`
+}
+
+// https://datatracker.ietf.org/doc/html/rfc3852#page-19
+//
+//	OtherRecipientInfo ::= SEQUENCE {
+//	  oriType OBJECT IDENTIFIER,
+//	  oriValue ANY DEFINED BY oriType }
+type OtherRecipientInfo struct {
+	OriType  asn1.ObjectIdentifier
+	OriValue interface{} `asn1:"implicit"` // // `asn1:"optional"` // asn1.RawValue
+}
+
+//  CMSORIforKEMOtherInfo ::= SEQUENCE {
+//    wrap KeyEncryptionAlgorithmIdentifier,
+//    kekLength INTEGER (1..65535),
+//    ukm [0] EXPLICIT UserKeyingMaterial OPTIONAL }
+
+type CMSORIforKEMOtherInfo struct {
+	Wrap      pkix.AlgorithmIdentifier
+	KEKLength int
+	UKM       []byte `asn1:"explicit,optional,tag:1"`
 }
 
 //	RecipientInfo ::= CHOICE {
@@ -76,12 +101,41 @@ type RecipientInfo struct {
 	ORI   OtherRecipientInfo    `asn1:"optional,tag:4"` // asn1.RawValue         `asn1:"optional,tag:4"`
 }
 
-//	OtherRecipientInfo ::= SEQUENCE {
-//	  oriType OBJECT IDENTIFIER,
-//	  oriValue ANY DEFINED BY oriType }
-type OtherRecipientInfo struct {
-	OriType  asn1.ObjectIdentifier
-	OriValue interface{} `asn1:"implicit"` // // `asn1:"optional"` // asn1.RawValue
+// UserKeyingMaterial ::= OCTET STRING
+type UserKeyingMaterial []byte
+
+type KEMRecipientInfo struct {
+	Version                int
+	Recipient              asn1.RawValue            `asn1:"choice"` // RecipientIdentifier      `asn1:"choice,implicit"`
+	KEMAlgorithm           pkix.AlgorithmIdentifier `asn1:"implicit,tag:0"`
+	KEMCipherText          []byte
+	KeyDerivationAlgorithm pkix.AlgorithmIdentifier
+	KekLength              int
+	UserKeyingMaterial     []byte `asn1:"explicit,tag:1,optional"`
+	KeyEncryptionAlgorithm pkix.AlgorithmIdentifier
+	EncryptedKey           []byte
+}
+
+//	AuthEnvelopedData ::= SEQUENCE {
+//		version CMSVersion,
+//		originatorInfo [0] IMPLICIT OriginatorInfo OPTIONAL,
+//		recipientInfos RecipientInfos,
+//		authEncryptedContentInfo EncryptedContentInfo,
+//
+// /	authAttrs [1] IMPLICIT AuthAttributes OPTIONAL,
+//
+//	mac MessageAuthenticationCode,
+//	unauthAttrs [2] IMPLICIT UnauthAttributes OPTIONAL }
+//
+// https://tools.ietf.org/html/rfc5083##section-2.1
+type AuthEnvelopedData struct {
+	Version        int
+	OriginatorInfo asn1.RawValue `asn1:"optional,implicit,tag:0"`
+	RecipientInfos RecipientInfo `asn1:"set,implicit"`
+	AECI           EncryptedContentInfo
+	AauthAttrs     []Attribute `asn1:"set,optional,implicit,tag:1"`
+	MAC            []byte
+	UnAauthAttrs   []Attribute `asn1:"set,optional,implicit,tag:2"`
 }
 
 //	KeyTransRecipientInfo ::= SEQUENCE {
@@ -179,14 +233,15 @@ type Attribute struct {
 //		contentEncryptionAlgorithm ContentEncryptionAlgorithmIdentifier,
 //		encryptedContent [0] IMPLICIT EncryptedContent OPTIONAL }
 type EncryptedContentInfo struct {
-	EContentType               asn1.ObjectIdentifier
+	Raw                        asn1.RawContent
+	ContentType                asn1.ObjectIdentifier
 	ContentEncryptionAlgorithm pkix.AlgorithmIdentifier
-	EContent                   []byte `asn1:"optional,implicit,tag:0"`
+	EncryptedContent           asn1.RawValue `asn1:"tag:0,optional"` //[]byte `asn1:"optional,implicit,tag:0"` //
 }
 
 type ContentInfo struct {
 	ContentType asn1.ObjectIdentifier
-	Content     asn1.RawValue `asn1:"explicit,tag:0"`
+	Content     asn1.RawValue `asn1:"tag:0"`
 }
 
 type IssuerAndSerialNumber struct {
@@ -198,11 +253,6 @@ type pkixPrivKey struct {
 	Version    int
 	Algorithm  pkix.AlgorithmIdentifier
 	PrivateKey []byte
-}
-
-type aesGCMParameters struct {
-	Nonce  []byte //`asn1:"tag:4"`
-	ICVLen int
 }
 
 // type pkixPubKey struct {
@@ -218,19 +268,15 @@ type RecipientIdentifier struct {
 	SubjectKeyIdentifier  SubjectKeyIdentifier `asn1:"tag:0,optional"`
 }
 
-// UserKeyingMaterial ::= OCTET STRING
-type UserKeyingMaterial []byte
+// https://github.com/avast/apkverifier/blob/master/fullsailor/pkcs7/pkcs7.go#L809
+type aesGCMParameters struct {
+	Nonce  []byte //`asn1:"tag:4"`
+	ICVLen int
+}
 
-type KEMRecipientInfo struct {
-	Version                int
-	Recipient              asn1.RawValue            `asn1:"choice"` // RecipientIdentifier      `asn1:"choice,implicit"`
-	KEMAlgorithm           pkix.AlgorithmIdentifier `asn1:"implicit,tag:0"`
-	KEMCipherText          []byte
-	KeyDerivationAlgorithm pkix.AlgorithmIdentifier
-	KekLength              int
-	UserKeyingMaterial     []byte `asn1:"explicit,tag:1,optional"`
-	KeyEncryptionAlgorithm pkix.AlgorithmIdentifier
-	EncryptedKey           []byte
+func marshalEncryptedContent(content []byte) asn1.RawValue {
+	asn1Content, _ := asn1.Marshal(content)
+	return asn1.RawValue{Tag: 0, Class: asn1.ClassContextSpecific, Bytes: asn1Content, IsCompound: false}
 }
 
 var (
@@ -266,8 +312,7 @@ LpsRMLVQGnSEgcM6b9P2ISTzdW1MB7sZsNtTO2dCSdcQANgGhwPsvdRQyoP1Vd96
 MPvjEQQkk/Y5diXnXzkxzXY7G18AVI7yjOchE5MwkXApTr5XuDeGuF4AS6oGVbgn
 gWaMQV2SDKMXm0JkCK4gKGFjlH1STOPKaPBgYZEoSSQEThDCiFUptisUDv9YsxNk
 WVoNQQLF
------END PUBLIC KEY-----
-`
+-----END PUBLIC KEY-----`
 
 	caPublicCert = `-----BEGIN CERTIFICATE-----
 MIIDdjCCAl6gAwIBAgIBATANBgkqhkiG9w0BAQsFADBMMQswCQYDVQQGEwJVUzEP
@@ -500,11 +545,20 @@ func main() {
 		return
 	}
 
-	// now use the kem public key to generate the kemciphertext
+	fmt.Printf("SubjectKeyId %s\n", hex.EncodeToString(phashk))
+
+	ie, err := NewIssuerAndSerialNumberRaw(issuedEKMCert)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Issuer and serialNumber %s\n", hex.EncodeToString(ie.Bytes))
 
 	var kemcipherText []byte
 	var kemSharedSecret []byte
-	if pkixa.Algorithm.Algorithm.Equal(mlkem758OID) {
+
+	// here is where the sender generates a new keypair:
+
+	if pkixa.Algorithm.Algorithm.Equal(OID_MLKEM768) {
 		ek, err := mlkem.NewEncapsulationKey768(pkixa.PublicKey.Bytes)
 		if err != nil {
 			panic(err)
@@ -512,9 +566,8 @@ func main() {
 		kemSharedSecret, kemcipherText = ek.Encapsulate()
 	}
 
+	fmt.Printf("kemcipherText %s\n", hex.EncodeToString(kemcipherText))
 	fmt.Printf("SharedSecret: kemShared (%s) \n", base64.StdEncoding.EncodeToString(kemSharedSecret))
-
-	var aad = []byte("myaad")
 
 	// create payload_encryption_key and payload_encryption_nonce and encrypt the payload
 	payload_encryption_key := make([]byte, 32)
@@ -524,71 +577,118 @@ func main() {
 	}
 	fmt.Printf("root_key %s \n", base64.StdEncoding.EncodeToString(payload_encryption_key))
 
-	plainTextPayload := []byte("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.")
-
-	root_block, err := aes.NewCipher(payload_encryption_key)
-	if err != nil {
-		panic(err.Error())
+	bobpubPEMblock, rest := pem.Decode([]byte(kemPublic))
+	if len(rest) != 0 {
+		fmt.Printf("trailing data found during pemDecode")
+		return
 	}
-	aesgcm_root, err := cipher.NewGCM(root_block)
-	if err != nil {
-		panic(err.Error())
-	}
-	payload_encryption_nonce := make([]byte, aesgcm_root.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, payload_encryption_nonce); err != nil {
-		panic(err.Error())
-	}
-	encryptedPayloadCipherText := aesgcm_root.Seal(nil, payload_encryption_nonce, plainTextPayload, aad)
-
-	// run a kdf on the sharedSecret to get a derivedKey
-	shared_secret_nonce := make([]byte, sha256.New().Size())
-	_, err = rand.Read(shared_secret_nonce)
-	if err != nil {
+	//var pkixa pkixPubKey
+	var bobpkixa x509.MLKEMPublicKeyInfo
+	if rest, err := asn1.Unmarshal(bobpubPEMblock.Bytes, &bobpkixa); err != nil {
 		panic(err)
+	} else if len(rest) != 0 {
+		fmt.Printf("rest not nil")
+		return
+	}
+	bhash := sha1.Sum(bobpkixa.PublicKey.Bytes)
+	bsk := bhash[:]
+
+	fmt.Printf("spi %s\n", hex.EncodeToString(bsk))
+
+	cori := CMSORIforKEMOtherInfo{
+		Wrap:      pkix.AlgorithmIdentifier{Algorithm: OID_AES_128_KEYWRAP},
+		KEKLength: 16, // aes 128 key
+		UKM:       nil,
 	}
 
-	kdf := hkdf.New(sha256.New, kemSharedSecret, shared_secret_nonce, aad)
-	kek_derived_key := make([]byte, 32)
+	coribytes, err := asn1.Marshal(cori)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("CMSORIforKEMOtherInfo %s\n", hex.EncodeToString(coribytes))
+
+	salt := []byte("")
+	kdf := hkdf.New(sha256.New, kemSharedSecret, salt, coribytes)
+	kek_derived_key := make([]byte, 16)
 	_, err = io.ReadFull(kdf, kek_derived_key)
 	if err != nil {
 		panic(err)
 	}
+	fmt.Printf("KEK %s\n", hex.EncodeToString(kek_derived_key))
 
-	fmt.Printf("sender derivedKey %s\n", hex.EncodeToString(kek_derived_key))
+	// this is where you generate an aes key
+	content_encryption_key_bytes := make([]byte, 32)
+	_, err = rand.Read(content_encryption_key_bytes)
+	if err != nil {
+		panic(err)
+	}
 
-	// use the kdf to encrypt payload_encryption_key
-	eblock, err := aes.NewCipher(kek_derived_key)
+	kek_block, err := aes.NewCipher(kek_derived_key)
 	if err != nil {
 		panic(err.Error())
 	}
 
-	aesgcm, err := cipher.NewGCM(eblock)
+	encrypted_content_key, err := keywrap.Wrap(kek_block, content_encryption_key_bytes)
 	if err != nil {
 		panic(err.Error())
 	}
 
-	kek_nonce := make([]byte, aesgcm.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, kek_nonce); err != nil {
+	//fmt.Printf("encrypted_content_key %s\n", hex.EncodeToString(encrypted_content_key))
+
+	// default
+	// nonce for aes128 keywrap:
+	// //   var defaultIV = []byte{0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6}
+
+	content_encryption_block, err := aes.NewCipher(content_encryption_key_bytes)
+	if err != nil {
+		panic(err.Error())
+	}
+	aesgcm, err := cipher.NewGCM(content_encryption_block)
+	if err != nil {
 		panic(err.Error())
 	}
 
-	encrypted_key := aesgcm.Seal(nil, kek_nonce, payload_encryption_key, aad)
-	fmt.Printf("encrypted payload_encryption_key %x\n", encrypted_key)
+	content_encryption_nonce_bytes := make([]byte, 12)
+	_, err = rand.Read(content_encryption_nonce_bytes)
+	if err != nil {
+		panic(err)
+	}
 
-	// extract the issuer and serial number
+	plainTextPayload := []byte("Hello, world!")
+	var aad = []byte("foo")
 
-	ie, err := NewIssuerAndSerialNumberRaw(issuedEKMCert)
+	ciphertextWithMac := aesgcm.Seal(nil, content_encryption_nonce_bytes, plainTextPayload, aad)
+
+	tagSize := aesgcm.Overhead() // Overhead() returns the tag size, which is 16 bytes for GCM
+
+	// The actual encrypted data (excluding the MAC)
+	actualCiphertext := ciphertextWithMac[:len(ciphertextWithMac)-tagSize]
+
+	// The Message Authentication Code (MAC) / Authentication Tag
+	mac := ciphertextWithMac[len(ciphertextWithMac)-tagSize:]
+
+	fmt.Printf("actualCiphertext %x\n", actualCiphertext)
+	fmt.Printf("ciphertextWithMac %x\n", ciphertextWithMac)
+	fmt.Printf("mac %x\n", mac)
+	fmt.Printf("tagSize %d\n", tagSize)
+
+	// Prepare ASN.1 Encrypted Content Info
+	ciphertextWithMac_paramSeq := aesGCMParameters{
+		Nonce:  content_encryption_nonce_bytes,
+		ICVLen: tagSize,
+	}
+
+	ciphertextWithMac_parameter_bytes, err := asn1.Marshal(ciphertextWithMac_paramSeq)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Issuer And SerialNumber: %s\n", base64.StdEncoding.EncodeToString(ie.Bytes))
+	/// ***********************
 
-	/// ********************************************************
-
-	// for issuer and serial number
 	// rii := RecipientIdentifier{
 	// 	IssuerAndSerialNumber: ie,
+	// 	// or
+	// 	//SubjectKeyIdentifier: phashk, // tag=0
 	// }
 	// rib, err := asn1.Marshal(rii)
 	// if err != nil {
@@ -609,66 +709,78 @@ func main() {
 			Tag:   asn1.TagOctetString,
 			Bytes: phashk,
 		},
-		KEMAlgorithm:  pkix.AlgorithmIdentifier{Algorithm: mlkem758OID},
+		KEMAlgorithm:  pkix.AlgorithmIdentifier{Algorithm: OID_MLKEM768},
 		KEMCipherText: kemcipherText,
 		KeyDerivationAlgorithm: pkix.AlgorithmIdentifier{
 			Algorithm: OID_HKDF_SHA256,
-			Parameters: asn1.RawValue{
-				Bytes: shared_secret_nonce,
-			},
 		},
-		KekLength:          len(kemSharedSecret),
-		UserKeyingMaterial: []byte("optional ukm"),
+		KekLength: len(kek_derived_key),
 		KeyEncryptionAlgorithm: pkix.AlgorithmIdentifier{
-			Algorithm: OID_AES_GCM_256,
-			Parameters: asn1.RawValue{
-				Bytes: kek_nonce,
-			},
+			Algorithm: OID_AES_128_KEYWRAP,
 		},
-		EncryptedKey: encrypted_key,
+		EncryptedKey: encrypted_content_key,
 	}
-
-	// asn1BytesKEMRecipient, err := asn1.Marshal(kcms)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
 
 	ori := OtherRecipientInfo{
 		OriType:  OID_KEMRecipientInfo,
 		OriValue: kcms,
 	}
+
 	ri := RecipientInfo{
 		ORI: ori,
 	}
 
-	fmt.Printf("payload_encrytion_nonce %s\n", hex.EncodeToString(payload_encryption_nonce))
 	eci := EncryptedContentInfo{
-		EContentType: AES256Wrap,
+		ContentType: OID_PKCS7_DATA,
 		ContentEncryptionAlgorithm: pkix.AlgorithmIdentifier{
-			Algorithm: OID_AES_GCM_256,
+			Algorithm: OID_AES_GCM_128,
 			Parameters: asn1.RawValue{
-				Tag:   asn1.TagOctetString,
-				Bytes: payload_encryption_nonce,
+				Class:      asn1.ClassUniversal,
+				Tag:        asn1.TagSequence,
+				FullBytes:  ciphertextWithMac_parameter_bytes,
+				IsCompound: true,
 			}},
-		EContent: encryptedPayloadCipherText,
+		EncryptedContent: marshalEncryptedContent(actualCiphertext),
 	}
 
-	// ************************************************************************
+	//const der = "\xA0\x5D\x30\x18\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x09\x03\x31\x0B\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x07\x01\x30\x1C\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x09\x05\x31\x0F\x17\x0D\x31\x37\x30\x31\x31\x37\x30\x31\x33\x31\x32\x36\x5A\x30\x23\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x09\x04\x31\x16\x04\x14\x6C\x07\xE3\x58\x71\x40\x4C\xCB\x0F\xC3\xB2\xD9\xE8\x53\xC4\x8E\x87\x1D\x94\xD7"
+	// var attributes []Attribute
+	// brest, err := asn1.UnmarshalWithParams([]byte(der), &attributes, "set,tag:0")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// for _, attr := range attributes {
+	// 	fmt.Println(attr)
+	// }
+	// fmt.Println(brest)
 
-	ed := EnvelopedData{
+	// idaaintendedRecipients := asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 33}
+
+	// //
+	// authAttr := Attribute{
+	// 	Type: idaaintendedRecipients,
+	// 	RawValue: []asn1.RawValue{{
+	// 		Class: asn1.ClassUniversal,
+	// 		Tag:   asn1.TagOctetString,
+	// 		Bytes: aad,
+	// 	},
+	// 	},
+	// }
+
+	ed := AuthEnvelopedData{
 		Version:        0,
-		RecipientInfos: ri, //[]RecipientInfo{ri},
-		ECI:            eci,
+		RecipientInfos: ri,
+		AECI:           eci,
+		MAC:            mac,
+		//AauthAttrs:     []Attribute{authAttr},
 	}
-
 	edBytes, err := asn1.Marshal(ed)
 	if err != nil {
 		log.Fatal(err)
 	}
-	//ContentInfo.EnvelopedData.RecipientInfos[0] = KEMRecipientInfo
 
 	ci := ContentInfo{
-		ContentType: OIDEnvelopedData,
+		ContentType: OID_AUTH_AuthEnvelopedData,
 		Content: asn1.RawValue{
 			Class:      asn1.ClassContextSpecific,
 			Tag:        0,
@@ -681,8 +793,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	//fmt.Printf("CMS DER Bytes: %s\n", base64.StdEncoding.EncodeToString(asn1Bytes))
 
 	kemblock := &pem.Block{
 		Type:  "CMS",
@@ -701,111 +811,7 @@ func main() {
 	}
 	ccertOut.Close()
 
-	//*********************** RECEIVER *************************************
-
-	// decode pem
-	rderblock, rest := pem.Decode(pemBytes)
-	if rderblock == nil {
-		fmt.Println("failed to decode PEM block")
-		return
-	}
-
-	// reconstruct the kemrecipient info
-
-	var rci ContentInfo
-	rrest, err := asn1.Unmarshal(rderblock.Bytes, &rci)
-	if err != nil {
-		log.Fatalf("failed to unmarshal: %v", err)
-	}
-	if len(rrest) > 0 {
-		fmt.Printf("Warning: %d bytes of trailing data after successful unmarshal\n", len(rrest))
-	}
-	fmt.Printf("ContentInfo Content Type %v\n", rci.ContentType)
-
-	var evd EnvelopedData
-	rerest, err := asn1.Unmarshal(rci.Content.Bytes, &evd)
-	if err != nil {
-		log.Fatalf("failed to unmarshal: %v", err)
-	}
-	if len(rerest) > 0 {
-		fmt.Printf("Warning: %d bytes of trailing data after successful unmarshal\n", len(rerest))
-	}
-
-	rori := ri.ORI
-
-	var myStruct KEMRecipientInfo
-
-	// check the type
-	fmt.Printf("r ori %v\n", rori.OriType)
-
-	myStruct = ori.OriValue.(KEMRecipientInfo)
-
-	kemCipherText_r := myStruct.KEMCipherText
-
-	dk, err := mlkem.NewDecapsulationKey768(prkix.PrivateKey)
-	if err != nil {
-		panic(err)
-	}
-
-	sharedKey, err := dk.Decapsulate(kemCipherText_r)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("SharedSecret: kemShared (%s) \n", base64.StdEncoding.EncodeToString(sharedKey))
-
-	// extract the kdf nonce and derive the aes key
-	rkdf_nonce := myStruct.KeyDerivationAlgorithm.Parameters
-
-	rkdf := hkdf.New(sha256.New, sharedKey, rkdf_nonce.Bytes, aad)
-	rderivedKey := make([]byte, 32)
-	_, err = io.ReadFull(rkdf, rderivedKey)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("receiver derivedKey %s\n", hex.EncodeToString(rderivedKey))
-
-	// extract the aes nonce and decrypt the data
-	aes_nonce := myStruct.KeyEncryptionAlgorithm.Parameters
-
-	rblock, err := aes.NewCipher(rderivedKey)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	raesgcm, err := cipher.NewGCM(rblock)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	rencrypted_key := myStruct.EncryptedKey
-	plain_root_key, err := raesgcm.Open(nil, aes_nonce.Bytes, rencrypted_key, aad)
-	if err != nil {
-		panic(err.Error())
-	}
-	fmt.Printf("plain_root_key %s\n", base64.StdEncoding.EncodeToString(plain_root_key))
-
-	// now decrypt the eencrypted payload
-
-	reci := evd.ECI
-	reci_nonce := reci.ContentEncryptionAlgorithm.Parameters.Bytes
-	reci_ciphertext := reci.EContent
-
-	rrblock, err := aes.NewCipher(plain_root_key)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	rraesgcm, err := cipher.NewGCM(rrblock)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	plain_encrypted_data, err := rraesgcm.Open(nil, reci_nonce, reci_ciphertext, aad)
-	if err != nil {
-		panic(err.Error())
-	}
-	fmt.Printf("plain_encrypted_data: \n%s\n", plain_encrypted_data)
+	/// *******************************************  RECEIVER *******************************************
 
 }
 

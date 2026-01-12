@@ -7,3 +7,4 @@ require (
 	github.com/smallstep/certinfo v1.15.0 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
 )
+
