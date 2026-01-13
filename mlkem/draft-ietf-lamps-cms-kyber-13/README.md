@@ -200,3 +200,6 @@ Error reading SMIME Content Info
 80ABE529AF7F0000:error:0688010A:asn1 encoding routines:asn1_template_noexp_d2i:nested asn1 error:crypto/asn1/tasn_dec.c:685:
 80ABE529AF7F0000:error:0688010A:asn1 encoding routines:asn1_template_ex_d2i:nested asn1 error:crypto/asn1/tasn_dec.c:537:Field=d.authEnvelopedData, Type=CMS_ContentInfo
 ```
+
+
+which after a bit of fiddling found out openssl uses the wrong tag value  [openssl/issues/26101](https://github.com/openssl/openssl/issues/26101)
