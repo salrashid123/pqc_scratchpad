@@ -249,10 +249,29 @@ type IssuerAndSerialNumber struct {
 	SerialNumber *big.Int
 }
 
-type pkixPrivKey struct {
-	Version    int
-	Algorithm  pkix.AlgorithmIdentifier
-	PrivateKey []byte
+//	PrivateKeyInfo ::= SEQUENCE {
+//	  version                   Version,
+//	  privateKeyAlgorithm       PrivateKeyAlgorithmIdentifier,
+//	  privateKey                PrivateKey,
+//	  attributes           [0]  IMPLICIT Attributes OPTIONAL }
+//
+// Version ::= INTEGER
+// PrivateKeyAlgorithmIdentifier ::= AlgorithmIdentifier
+// PrivateKey ::= OCTET STRING
+// Attributes ::= SET OF Attribute
+type PrivateKeyInfo struct {
+	Version             int
+	PrivateKeyAlgorithm pkix.AlgorithmIdentifier
+	PrivateKey          []byte      `asn1:""`                            // The actual key data, an OCTET STRING
+	Attributes          []Attribute `asn1:"optional,tag:0,implicit,set"` // Optional attributes
+}
+
+//	SubjectPublicKeyInfo  ::=  SEQUENCE  {
+//	     algorithm            AlgorithmIdentifier,
+//	     subjectPublicKey     BIT STRING  }
+type SubjectPublicKeyInfo struct {
+	Algorithm pkix.AlgorithmIdentifier
+	PublicKey asn1.BitString
 }
 
 // type pkixPubKey struct {
@@ -393,7 +412,7 @@ func main() {
 		fmt.Printf("trailing data found during pemDecode")
 		return
 	}
-	var prkix pkixPrivKey
+	var prkix PrivateKeyInfo
 	if rest, err := asn1.Unmarshal(privPEMblock.Bytes, &prkix); err != nil {
 		panic(err)
 	} else if len(rest) != 0 {
@@ -444,7 +463,7 @@ func main() {
 
 	//  now issue a certificate for the kem key
 
-	fmt.Printf("Creating public x509")
+	fmt.Printf("Creating public x509\n")
 
 	var notBefore time.Time
 	notBefore = time.Now()

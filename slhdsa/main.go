@@ -12,8 +12,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/cloudflare/circl/pki"
-	"github.com/cloudflare/circl/sign/mldsa/mldsa44"
+	"github.com/cloudflare/circl/sign/slhdsa"
 )
 
 const ()
@@ -56,7 +55,7 @@ type SubjectPublicKeyInfo struct {
 }
 
 var (
-	mldsa44aoid = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 17}
+	OID_sl_dsa_128s = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 20}
 )
 
 var ()
@@ -64,9 +63,9 @@ var ()
 func main() {
 	flag.Parse()
 
-	/// ********************************* READ
+	/// ********************************* READ "bareseed"
 
-	var pubs *mldsa44.PublicKey
+	var pubs *slhdsa.PublicKey
 
 	// now read the public key back from pem
 	rpub_bytes, err := os.ReadFile("certs/public.pem")
@@ -79,22 +78,35 @@ func main() {
 		fmt.Printf("trailing data found during pemDecode")
 		return
 	}
-	var pkix SubjectPublicKeyInfo
-	if rest, err := asn1.Unmarshal(pubPEMblock.Bytes, &pkix); err != nil {
+	var rpkix SubjectPublicKeyInfo
+	if rest, err := asn1.Unmarshal(pubPEMblock.Bytes, &rpkix); err != nil {
 		panic(err)
 	} else if len(rest) != 0 {
 		fmt.Printf("rest not nil")
 		return
 	}
 
-	if pkix.Algorithm.Algorithm.Equal(mldsa44aoid) {
-		fmt.Println("Found MLDSA-44 in public key")
+	if rpkix.Algorithm.Algorithm.Equal(OID_sl_dsa_128s) {
+		fmt.Println("Found OID_sl_dsa_128s in public key")
 
-		pub, err := pki.UnmarshalPKIXPublicKey(pubPEMblock.Bytes)
+		var pkix struct {
+			Raw       asn1.RawContent
+			Algorithm pkix.AlgorithmIdentifier
+			PublicKey asn1.BitString
+		}
+		if rest, err := asn1.Unmarshal(pubPEMblock.Bytes, &pkix); err != nil {
+			panic(err)
+		} else if len(rest) != 0 {
+			fmt.Printf("trailing data")
+			return
+		}
+		key := slhdsa.PublicKey{ID: slhdsa.SHA2_128s}
+		err = key.UnmarshalBinary(pkix.PublicKey.Bytes)
 		if err != nil {
 			panic(err)
 		}
-		pubs = pub.(*mldsa44.PublicKey)
+
+		pubs = &key
 	} else {
 		fmt.Printf("unable to parse public key")
 		return
@@ -117,24 +129,46 @@ func main() {
 		fmt.Printf("rest not nil")
 	}
 
-	if rprkix.PrivateKeyAlgorithm.Algorithm.Equal(mldsa44aoid) {
-		fmt.Println("Found  MLDSA-44  in private key")
+	//*******************
 
-		data := []byte("foo")
-		_, pr := mldsa44.NewKeyFromSeed((*[32]byte)(rprkix.PrivateKey))
-		sig, err := pr.Sign(rand.Reader, data, crypto.Hash(0))
-		if err != nil {
-			panic(err)
-		}
-		log.Printf("Signature %s", base64.StdEncoding.EncodeToString(sig))
+	key := slhdsa.PrivateKey{ID: slhdsa.SHA2_128s}
+	err = key.UnmarshalBinary(rprkix.PrivateKey)
+	if err != nil {
+		panic(err)
+	}
 
-		ok := mldsa44.Verify(pubs, data, nil, sig)
-		if !ok {
-			log.Printf("Error verifying")
-		}
-		log.Println("Signature Verified")
-	} else {
-		fmt.Printf("unable to parse priate key")
+	data := []byte("foo")
+
+	sig, err := key.Sign(rand.Reader, data, crypto.Hash(0))
+	if err != nil {
+		panic(err)
+	}
+
+	log.Printf("Signature %s", base64.StdEncoding.EncodeToString(sig))
+
+	ok := slhdsa.Verify(pubs, slhdsa.NewMessage(data), sig, nil)
+	if !ok {
+		log.Printf("Error verifying")
 		return
 	}
+	log.Println("Signature  1 Verified")
+
+	/// *******************
+
+	// m := slhdsa.NewMessage(data)
+
+	// ss, err := slhdsa.SignDeterministic(&key, m, []byte("foo"))
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// log.Printf("Signature  SignDeterministic %s\n", base64.StdEncoding.EncodeToString(ss))
+
+	// ok = slhdsa.Verify(pubs, slhdsa.NewMessage(data), sig, nil)
+	// if !ok {
+	// 	log.Printf("Error verifying")
+	// 	return
+	// }
+	// log.Println("Signature  1 Verified")
+
 }

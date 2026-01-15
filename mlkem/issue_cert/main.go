@@ -24,16 +24,42 @@ var (
 	mlkem758OID = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 2}
 )
 
-type pkixPrivKey struct {
-	Version    int
-	Algorithm  pkix.AlgorithmIdentifier
-	PrivateKey []byte
+//	PrivateKeyInfo ::= SEQUENCE {
+//	  version                   Version,
+//	  privateKeyAlgorithm       PrivateKeyAlgorithmIdentifier,
+//	  privateKey                PrivateKey,
+//	  attributes           [0]  IMPLICIT Attributes OPTIONAL }
+//
+// Version ::= INTEGER
+// PrivateKeyAlgorithmIdentifier ::= AlgorithmIdentifier
+// PrivateKey ::= OCTET STRING
+// Attributes ::= SET OF Attribute
+type PrivateKeyInfo struct {
+	Version             int
+	PrivateKeyAlgorithm pkix.AlgorithmIdentifier
+	PrivateKey          []byte      `asn1:""`                            // The actual key data, an OCTET STRING
+	Attributes          []Attribute `asn1:"optional,tag:0,implicit,set"` // Optional attributes
 }
 
-// type pkixPubKey struct {
-// 	Algorithm pkix.AlgorithmIdentifier
-// 	PublicKey asn1.BitString
-// }
+//	Attribute ::= SEQUENCE {
+//	  attrType OBJECT IDENTIFIER,
+//	  attrValues SET OF AttributeValue }
+//
+// AttributeValue ::= ANY
+type Attribute struct {
+	Type asn1.ObjectIdentifier
+	// This should be a SET OF ANY, but Go's asn1 parser can't handle slices of
+	// RawValues. Use value() to get an AnySet of the value.
+	RawValue []asn1.RawValue `asn1:"set"`
+}
+
+//	SubjectPublicKeyInfo  ::=  SEQUENCE  {
+//	     algorithm            AlgorithmIdentifier,
+//	     subjectPublicKey     BIT STRING  }
+type SubjectPublicKeyInfo struct {
+	Algorithm pkix.AlgorithmIdentifier
+	PublicKey asn1.BitString
+}
 
 var (
 	kemPrivate = `-----BEGIN PRIVATE KEY-----
@@ -128,10 +154,6 @@ func main() {
 
 	flag.Parse()
 
-	// pubBytes, err := os.ReadFile("certs/pub-ml-kem-768.pem")
-	// if err != nil {
-	// 	panic(err)
-	// }
 	pubPEMblock, rest := pem.Decode([]byte(kemPublic))
 	if len(rest) != 0 {
 		fmt.Printf("trailing data found during pemDecode")
@@ -165,7 +187,7 @@ func main() {
 		fmt.Printf("trailing data found during pemDecode")
 		return
 	}
-	var prkix pkixPrivKey
+	var prkix PrivateKeyInfo
 	if rest, err := asn1.Unmarshal(privPEMblock.Bytes, &prkix); err != nil {
 		panic(err)
 	} else if len(rest) != 0 {
@@ -173,7 +195,7 @@ func main() {
 		return
 	}
 
-	if prkix.Algorithm.Algorithm.Equal(mlkem758OID) {
+	if prkix.PrivateKeyAlgorithm.Algorithm.Equal(mlkem758OID) {
 		// openssl pkey -provparam ml-kem.output_formats=bare-seed  -in  priv-ml-kem-768.pem -out bare-seed.pem
 		dk, err := mlkem.NewDecapsulationKey768(prkix.PrivateKey)
 		if err != nil {
@@ -188,12 +210,12 @@ func main() {
 	}
 
 	block, _ := pem.Decode([]byte(caPublicCert))
-	cert, err := x509.ParseCertificate(block.Bytes)
+	CAcert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("%s\n", cert.Issuer)
+	fmt.Printf("%s\n", CAcert.Issuer)
 
 	rkblock, _ := pem.Decode([]byte(caPrivate))
 
@@ -212,7 +234,7 @@ func main() {
 			CommonName:         "mytpm",
 		},
 		DNSNames:  []string{"mytpm"},
-		PublicKey: pkixa,
+		PublicKey: &pkixa,
 	}
 
 	// csrBytes, err := x509.CreateCertificateRequest(rand.Reader, &csrtemplate, nkp)
@@ -259,7 +281,7 @@ func main() {
 		IsCA:                  false,
 	}
 
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, cert, csrtemplate.PublicKey, priv.(*rsa.PrivateKey))
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, CAcert, csrtemplate.PublicKey, priv.(*rsa.PrivateKey))
 	if err != nil {
 		log.Fatalf("Failed to create certificate: %s", err)
 	}

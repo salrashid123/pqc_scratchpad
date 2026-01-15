@@ -1,12 +1,12 @@
 diff --git a/src/crypto/x509/x509.go b/src/crypto/x509/x509.go
-index 1f06b4fbc5..4daf6a5ffd 100644
+index 1f06b4fbc5..25a5eee5c5 100644
 --- a/src/crypto/x509/x509.go
 +++ b/src/crypto/x509/x509.go
 @@ -132,6 +132,9 @@ func marshalPublicKey(pub any) (publicKeyBytes []byte, publicKeyAlgorithm pkix.A
  			}
  			publicKeyAlgorithm.Parameters.FullBytes = paramBytes
  		}
-+	case MLKEMPublicKeyInfo:
++	case *MLKEMPublicKeyInfo:
 +		publicKeyBytes = pub.PublicKey.Bytes
 +		publicKeyAlgorithm.Algorithm = oidPublicKeyMLKEM768
  	default:

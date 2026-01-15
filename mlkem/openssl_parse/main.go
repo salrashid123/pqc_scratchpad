@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"crypto/mlkem"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -37,14 +39,39 @@ var (
 	mlkem758OID = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 2}
 )
 
-type pkixPrivKey struct {
-	Version    int
-	Algorithm  pkix.AlgorithmIdentifier
-	PrivateKey []byte
+//	PrivateKeyInfo ::= SEQUENCE {
+//	  version                   Version,
+//	  privateKeyAlgorithm       PrivateKeyAlgorithmIdentifier,
+//	  privateKey                PrivateKey,
+//	  attributes           [0]  IMPLICIT Attributes OPTIONAL }
+//
+// Version ::= INTEGER
+// PrivateKeyAlgorithmIdentifier ::= AlgorithmIdentifier
+// PrivateKey ::= OCTET STRING
+// Attributes ::= SET OF Attribute
+type PrivateKeyInfo struct {
+	Version             int
+	PrivateKeyAlgorithm pkix.AlgorithmIdentifier
+	PrivateKey          []byte      `asn1:""`                            // The actual key data, an OCTET STRING
+	Attributes          []Attribute `asn1:"optional,tag:0,implicit,set"` // Optional attributes
 }
 
-type pkixPubKey struct {
-	Raw       asn1.RawContent
+//	Attribute ::= SEQUENCE {
+//	  attrType OBJECT IDENTIFIER,
+//	  attrValues SET OF AttributeValue }
+//
+// AttributeValue ::= ANY
+type Attribute struct {
+	Type asn1.ObjectIdentifier
+	// This should be a SET OF ANY, but Go's asn1 parser can't handle slices of
+	// RawValues. Use value() to get an AnySet of the value.
+	RawValue []asn1.RawValue `asn1:"set"`
+}
+
+//	SubjectPublicKeyInfo  ::=  SEQUENCE  {
+//	     algorithm            AlgorithmIdentifier,
+//	     subjectPublicKey     BIT STRING  }
+type SubjectPublicKeyInfo struct {
 	Algorithm pkix.AlgorithmIdentifier
 	PublicKey asn1.BitString
 }
@@ -60,7 +87,7 @@ func main() {
 		fmt.Printf("trailing data found during pemDecode")
 		return
 	}
-	var pkix pkixPubKey
+	var pkix SubjectPublicKeyInfo
 	if rest, err := asn1.Unmarshal(pubPEMblock.Bytes, &pkix); err != nil {
 		panic(err)
 	} else if len(rest) != 0 {
@@ -84,7 +111,7 @@ func main() {
 
 	/// ********************************************
 
-	privBytes, err := os.ReadFile("certs/bare-seed.pem")
+	privBytes, err := os.ReadFile("certs/seed-only.pem")
 	if err != nil {
 		panic(err)
 	}
@@ -93,14 +120,14 @@ func main() {
 		fmt.Printf("trailing data found during pemDecode")
 		return
 	}
-	var prkix pkixPrivKey
+	var prkix PrivateKeyInfo
 	if rest, err := asn1.Unmarshal(privPEMblock.Bytes, &prkix); err != nil {
 		panic(err)
 	} else if len(rest) != 0 {
 		fmt.Printf("rest not nil")
 	}
 
-	if prkix.Algorithm.Algorithm.Equal(mlkem758OID) {
+	if prkix.PrivateKeyAlgorithm.Algorithm.Equal(mlkem758OID) {
 		fmt.Println("Found MLKEM758")
 
 		// https://github.com/openssl/openssl/blob/ba90c491254fd3cee8a2f791fc191dcff27036c1/providers/implementations/encode_decode/ml_kem_codecs.c#L52C34-L52C38
@@ -116,21 +143,21 @@ func main() {
 
 		// openssl pkey -provparam ml-kem.output_formats=bare-seed  -in  priv-ml-kem-768.pem -out bare-seed.pem
 
-		// if bytes.Equal(prkix.PrivateKey[:2], []byte{80, 40}) {
-		// 	log.Printf("private key not `seed-only`")
-		// 	return
-		// }
+		if bytes.Equal(prkix.PrivateKey[:2], []byte{80, 40}) {
+			log.Printf("private key not `seed-only`")
+			return
+		}
 
-		// dk, err := mlkem.NewDecapsulationKey768(prkix.PrivateKey[2:])
-		// if err != nil {
-		// 	log.Fatal(err)
-		// }
-
-		// openssl pkey -provparam ml-kem.output_formats=bare-seed  -in  priv-ml-kem-768.pem -out bare-seed.pem
-		dk, err := mlkem.NewDecapsulationKey768(prkix.PrivateKey)
+		dk, err := mlkem.NewDecapsulationKey768(prkix.PrivateKey[2:])
 		if err != nil {
 			panic(err)
 		}
+
+		// openssl pkey -provparam ml-kem.output_formats=bare-seed  -in  priv-ml-kem-768.pem -out bare-seed.pem
+		// dk, err := mlkem.NewDecapsulationKey768(prkix.PrivateKey)
+		// if err != nil {
+		// 	panic(err)
+		// }
 
 		sharedKey, err := dk.Decapsulate(cipherText)
 		if err != nil {

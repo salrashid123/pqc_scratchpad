@@ -205,10 +205,30 @@ type aesGCMParameters struct {
 	ICVLen int
 }
 
-// type pkixPubKey struct {
-// 	Algorithm pkix.AlgorithmIdentifier
-// 	PublicKey asn1.BitString
-// }
+//	PrivateKeyInfo ::= SEQUENCE {
+//	  version                   Version,
+//	  privateKeyAlgorithm       PrivateKeyAlgorithmIdentifier,
+//	  privateKey                PrivateKey,
+//	  attributes           [0]  IMPLICIT Attributes OPTIONAL }
+//
+// Version ::= INTEGER
+// PrivateKeyAlgorithmIdentifier ::= AlgorithmIdentifier
+// PrivateKey ::= OCTET STRING
+// Attributes ::= SET OF Attribute
+type PrivateKeyInfo struct {
+	Version             int
+	PrivateKeyAlgorithm pkix.AlgorithmIdentifier
+	PrivateKey          []byte      `asn1:""`                            // The actual key data, an OCTET STRING
+	Attributes          []Attribute `asn1:"optional,tag:0,implicit,set"` // Optional attributes
+}
+
+//	SubjectPublicKeyInfo  ::=  SEQUENCE  {
+//	     algorithm            AlgorithmIdentifier,
+//	     subjectPublicKey     BIT STRING  }
+type SubjectPublicKeyInfo struct {
+	Algorithm pkix.AlgorithmIdentifier
+	PublicKey asn1.BitString
+}
 
 // SubjectKeyIdentifier ::= OCTET STRING
 type SubjectKeyIdentifier []byte

@@ -4,7 +4,7 @@ import (
 	"crypto/mlkem"
 	"crypto/x509/pkix"
 	"encoding/asn1"
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"log"
@@ -15,44 +15,58 @@ var (
 	mlkem758OID = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 2}
 )
 
-type pkixPrivKey struct {
-	Version    int
-	Algorithm  pkix.AlgorithmIdentifier
-	PrivateKey []byte
+//	PrivateKeyInfo ::= SEQUENCE {
+//	  version                   Version,
+//	  privateKeyAlgorithm       PrivateKeyAlgorithmIdentifier,
+//	  privateKey                PrivateKey,
+//	  attributes           [0]  IMPLICIT Attributes OPTIONAL }
+//
+// Version ::= INTEGER
+// PrivateKeyAlgorithmIdentifier ::= AlgorithmIdentifier
+// PrivateKey ::= OCTET STRING
+// Attributes ::= SET OF Attribute
+type PrivateKeyInfo struct {
+	Version             int
+	PrivateKeyAlgorithm pkix.AlgorithmIdentifier
+	PrivateKey          []byte      `asn1:""`                            // The actual key data, an OCTET STRING
+	Attributes          []Attribute `asn1:"optional,tag:0,implicit,set"` // Optional attributes
 }
 
-type pkixPubKey struct {
-	Raw       asn1.RawContent
+//	Attribute ::= SEQUENCE {
+//	  attrType OBJECT IDENTIFIER,
+//	  attrValues SET OF AttributeValue }
+//
+// AttributeValue ::= ANY
+type Attribute struct {
+	Type asn1.ObjectIdentifier
+	// This should be a SET OF ANY, but Go's asn1 parser can't handle slices of
+	// RawValues. Use value() to get an AnySet of the value.
+	RawValue []asn1.RawValue `asn1:"set"`
+}
+
+//	SubjectPublicKeyInfo  ::=  SEQUENCE  {
+//	     algorithm            AlgorithmIdentifier,
+//	     subjectPublicKey     BIT STRING  }
+type SubjectPublicKeyInfo struct {
 	Algorithm pkix.AlgorithmIdentifier
 	PublicKey asn1.BitString
 }
 
 func main() {
 
+	// generate a new keypair
 	mk, err := mlkem.GenerateKey768()
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// get the public/private bytes
 	pubbin := mk.EncapsulationKey().Bytes()
 	privbin := mk.Bytes()
 
-	err = os.WriteFile("certs/bpub.dat", pubbin, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// write the public private to PEM files
 
-	err = os.WriteFile("certs/bpriv.dat", privbin, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	pu, err := mlkem.NewEncapsulationKey768(pubbin)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	pux := &pkixPubKey{
+	pux := &SubjectPublicKeyInfo{
 		Algorithm: pkix.AlgorithmIdentifier{Algorithm: mlkem758OID},
 		PublicKey: asn1.BitString{
 			Bytes:     pubbin,
@@ -73,9 +87,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	prkix := &pkixPrivKey{
+	prkix := &PrivateKeyInfo{
 		Version: 0,
-		Algorithm: pkix.AlgorithmIdentifier{
+		PrivateKeyAlgorithm: pkix.AlgorithmIdentifier{
 			Algorithm: mlkem758OID,
 		},
 		PrivateKey: privbin,
@@ -89,24 +103,77 @@ func main() {
 		Bytes: br,
 	})
 
-	err = os.WriteFile("certs/private.pem", prstr, 0644)
+	err = os.WriteFile("certs/bare-seed.pem", prstr, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	shared, ciphertext := pu.Encapsulate()
-	fmt.Fprintf(os.Stdout, "SharedSecret: kemShared (%s) \n", hex.EncodeToString(shared))
+	/// ********************************* READ
 
-	// now read the bytes to decapsulate
-	pr, err := mlkem.NewDecapsulationKey768(privbin)
+	// now read the public key back from pem
+	rpub_bytes, err := os.ReadFile("certs/public.pem")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	recovered, err := pr.Decapsulate(ciphertext)
-	if err != nil {
-		log.Fatal(err)
+	pubPEMblock, rest := pem.Decode(rpub_bytes)
+	if len(rest) != 0 {
+		fmt.Printf("trailing data found during pemDecode")
+		return
 	}
-	fmt.Fprintf(os.Stdout, "SharedSecret: kemShared (%s) \n", hex.EncodeToString(recovered))
+	var pkix SubjectPublicKeyInfo
+	if rest, err := asn1.Unmarshal(pubPEMblock.Bytes, &pkix); err != nil {
+		panic(err)
+	} else if len(rest) != 0 {
+		fmt.Printf("rest not nil")
+		return
+	}
+
+	var cipherText []byte
+	var kemSharedSecret []byte
+	if pkix.Algorithm.Algorithm.Equal(mlkem758OID) {
+		fmt.Println("Found MLKEM758 in public key")
+
+		ek, err := mlkem.NewEncapsulationKey768(pkix.PublicKey.Bytes)
+		if err != nil {
+			panic(err)
+		}
+		kemSharedSecret, cipherText = ek.Encapsulate()
+	}
+
+	fmt.Printf("sharedSecret %s \n", base64.StdEncoding.EncodeToString(kemSharedSecret))
+	fmt.Printf("cipherText %s \n", base64.StdEncoding.EncodeToString(cipherText))
+
+	// now read the privarte key back from pem
+	privBytes, err := os.ReadFile("certs/bare-seed.pem")
+	if err != nil {
+		panic(err)
+	}
+	privPEMblock, rest := pem.Decode(privBytes)
+	if len(rest) != 0 {
+		fmt.Printf("trailing data found during pemDecode")
+		return
+	}
+	var rprkix PrivateKeyInfo
+	if rest, err := asn1.Unmarshal(privPEMblock.Bytes, &rprkix); err != nil {
+		panic(err)
+	} else if len(rest) != 0 {
+		fmt.Printf("rest not nil")
+	}
+
+	if rprkix.PrivateKeyAlgorithm.Algorithm.Equal(mlkem758OID) {
+		fmt.Println("Found MLKEM758 in private key")
+
+		dk, err := mlkem.NewDecapsulationKey768(rprkix.PrivateKey)
+		if err != nil {
+			panic(err)
+		}
+
+		sharedKey, err := dk.Decapsulate(cipherText)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("recovered shared secret: kemShared %s \n", base64.StdEncoding.EncodeToString(sharedKey))
+	}
 
 }
