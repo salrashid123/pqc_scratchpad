@@ -73,7 +73,7 @@ type EnvelopedData struct {
 //	  oriValue ANY DEFINED BY oriType }
 type OtherRecipientInfo struct {
 	OriType  asn1.ObjectIdentifier
-	OriValue interface{} `asn1:"implicit"` // // `asn1:"optional"` // asn1.RawValue
+	OriValue KEMRecipientInfo //interface{} `asn1:"implicit"` // // `asn1:"optional"` // asn1.RawValue
 }
 
 //  CMSORIforKEMOtherInfo ::= SEQUENCE {
@@ -133,9 +133,9 @@ type AuthEnvelopedData struct {
 	OriginatorInfo asn1.RawValue `asn1:"optional,implicit,tag:0"`
 	RecipientInfos RecipientInfo `asn1:"set,implicit"`
 	AECI           EncryptedContentInfo
-	AauthAttrs     []Attribute `asn1:"set,optional,implicit,tag:1"`
+	AauthAttrs     []Attribute `asn1:"set,optional,implicit,tag:2"` /// <<< modified from 1 to 2 to accoodate  https://github.com/openssl/openssl/issues/26101
 	MAC            []byte
-	UnAauthAttrs   []Attribute `asn1:"set,optional,implicit,tag:2"`
+	UnAauthAttrs   []Attribute `asn1:"set,optional,implicit,tag:3"` /// <<< modified from 2 to 3 to accoodate  https://github.com/openssl/openssl/issues/26101
 }
 
 //	KeyTransRecipientInfo ::= SEQUENCE {
@@ -293,11 +293,6 @@ type aesGCMParameters struct {
 	ICVLen int
 }
 
-func marshalEncryptedContent(content []byte) asn1.RawValue {
-	asn1Content, _ := asn1.Marshal(content)
-	return asn1.RawValue{Tag: 0, Class: asn1.ClassContextSpecific, Bytes: asn1Content, IsCompound: false}
-}
-
 var (
 	kemPrivate = `-----BEGIN PRIVATE KEY-----
 MFICAQAwCwYJYIZIAWUDBAQCBEBn5ryByEaAgALO1xu/ioxBla8qN2FMTIHAtklg
@@ -391,29 +386,32 @@ func main() {
 	flag.Parse()
 
 	//*********************** RECEIVER *************************************
+
+	fmt.Println("****************  RECEIVER **********************")
+	fmt.Println("generate key and issue x509")
 	// read recepients public private key
 
-	pubPEMblock, rest := pem.Decode([]byte(kemPublic))
+	alice_pubPEMblock, rest := pem.Decode([]byte(kemPublic))
 	if len(rest) != 0 {
 		fmt.Printf("trailing data found during pemDecode")
 		return
 	}
-	//var pkixa pkixPubKey
-	var pkixa x509.MLKEMPublicKeyInfo
-	if rest, err := asn1.Unmarshal(pubPEMblock.Bytes, &pkixa); err != nil {
+
+	var alice_ml_kem_public_key_info x509.MLKEMPublicKeyInfo
+	if rest, err := asn1.Unmarshal(alice_pubPEMblock.Bytes, &alice_ml_kem_public_key_info); err != nil {
 		panic(err)
 	} else if len(rest) != 0 {
 		fmt.Printf("rest not nil")
 		return
 	}
 
-	privPEMblock, rest := pem.Decode([]byte(kemPrivate))
+	alice_privPEMblock, rest := pem.Decode([]byte(kemPrivate))
 	if len(rest) != 0 {
 		fmt.Printf("trailing data found during pemDecode")
 		return
 	}
-	var prkix PrivateKeyInfo
-	if rest, err := asn1.Unmarshal(privPEMblock.Bytes, &prkix); err != nil {
+	var alice_private_key_info PrivateKeyInfo
+	if rest, err := asn1.Unmarshal(alice_privPEMblock.Bytes, &alice_private_key_info); err != nil {
 		panic(err)
 	} else if len(rest) != 0 {
 		fmt.Printf("rest not nil")
@@ -446,7 +444,7 @@ func main() {
 			CommonName:         "recepient1",
 		},
 		DNSNames:  []string{"recipient1"},
-		PublicKey: &pkixa, // <<<<<<<<<<<<<< kem public key
+		PublicKey: &alice_ml_kem_public_key_info, // <<<<<<<<<<<<<< kem public key
 	}
 
 	// csrBytes, err := x509.CreateCertificateRequest(rand.Reader, &csrtemplate, nkp)
@@ -478,7 +476,7 @@ func main() {
 	// calculate skid
 	// The actual key bytes are in pubKeyInfo.PublicKey.Bytes.
 	// Hash these bytes using SHA-1.
-	hash := sha1.Sum(pkixa.PublicKey.Bytes)
+	hash := sha1.Sum(alice_ml_kem_public_key_info.PublicKey.Bytes)
 	sk := hash[:]
 
 	// now create a certificate and sign it.
@@ -518,8 +516,11 @@ func main() {
 	certOut.Close()
 	fmt.Print("wrote issued.pem\n")
 
+	fmt.Println()
+	fmt.Println()
 	//*********************** SENDER *************************************
 
+	fmt.Println("****************  SENDER **********************")
 	// now
 	// read the recipeents x509
 	issuedEKMCert, err := x509.ParseCertificate(derBytes)
@@ -543,20 +544,20 @@ func main() {
 
 	// now get the public key from the cert and get its hash
 
-	publicKeyDER, err := x509.MarshalPKIXPublicKey(issuedEKMCert.PublicKey)
+	sender_recalled_ekm_cert_publicKeyDER, err := x509.MarshalPKIXPublicKey(issuedEKMCert.PublicKey)
 	if err != nil {
 		log.Fatalf("Error marshaling public key to DER: %v", err)
 	}
 
-	var pkixaa x509.MLKEMPublicKeyInfo
-	if rest, err := asn1.Unmarshal(publicKeyDER, &pkixaa); err != nil {
+	var sender_renerated_mlkemPublicKeyInfo x509.MLKEMPublicKeyInfo
+	if rest, err := asn1.Unmarshal(sender_recalled_ekm_cert_publicKeyDER, &sender_renerated_mlkemPublicKeyInfo); err != nil {
 		panic(err)
 	} else if len(rest) != 0 {
 		fmt.Printf("rest not nil")
 		return
 	}
 
-	phash := sha1.Sum(pkixaa.PublicKey.Bytes)
+	phash := sha1.Sum(sender_renerated_mlkemPublicKeyInfo.PublicKey.Bytes)
 	phashk := phash[:]
 	// compare if the issued cert matches the subjectKeyID
 	if !bytes.Equal(phashk, issuedEKMCert.SubjectKeyId) {
@@ -577,16 +578,16 @@ func main() {
 
 	// here is where the sender generates a new keypair:
 
-	if pkixa.Algorithm.Algorithm.Equal(OID_MLKEM768) {
-		ek, err := mlkem.NewEncapsulationKey768(pkixa.PublicKey.Bytes)
+	if sender_renerated_mlkemPublicKeyInfo.Algorithm.Algorithm.Equal(OID_MLKEM768) {
+		ek, err := mlkem.NewEncapsulationKey768(sender_renerated_mlkemPublicKeyInfo.PublicKey.Bytes)
 		if err != nil {
 			panic(err)
 		}
 		kemSharedSecret, kemcipherText = ek.Encapsulate()
 	}
 
-	fmt.Printf("kemcipherText %s\n", hex.EncodeToString(kemcipherText))
-	fmt.Printf("SharedSecret: kemShared (%s) \n", base64.StdEncoding.EncodeToString(kemSharedSecret))
+	fmt.Printf("kemcipherText %s\n", base64.StdEncoding.EncodeToString(kemcipherText))
+	fmt.Printf("SharedSecret: kemShared %s \n", base64.StdEncoding.EncodeToString(kemSharedSecret))
 
 	// create payload_encryption_key and payload_encryption_nonce and encrypt the payload
 	payload_encryption_key := make([]byte, 32)
@@ -596,20 +597,7 @@ func main() {
 	}
 	fmt.Printf("root_key %s \n", base64.StdEncoding.EncodeToString(payload_encryption_key))
 
-	bobpubPEMblock, rest := pem.Decode([]byte(kemPublic))
-	if len(rest) != 0 {
-		fmt.Printf("trailing data found during pemDecode")
-		return
-	}
-	//var pkixa pkixPubKey
-	var bobpkixa x509.MLKEMPublicKeyInfo
-	if rest, err := asn1.Unmarshal(bobpubPEMblock.Bytes, &bobpkixa); err != nil {
-		panic(err)
-	} else if len(rest) != 0 {
-		fmt.Printf("rest not nil")
-		return
-	}
-	bhash := sha1.Sum(bobpkixa.PublicKey.Bytes)
+	bhash := sha1.Sum(sender_renerated_mlkemPublicKeyInfo.PublicKey.Bytes)
 	bsk := bhash[:]
 
 	fmt.Printf("spi %s\n", hex.EncodeToString(bsk))
@@ -652,7 +640,7 @@ func main() {
 		panic(err.Error())
 	}
 
-	//fmt.Printf("encrypted_content_key %s\n", hex.EncodeToString(encrypted_content_key))
+	fmt.Printf("encrypted_content_key %s\n", hex.EncodeToString(encrypted_content_key))
 
 	// default
 	// nonce for aes128 keywrap:
@@ -686,6 +674,7 @@ func main() {
 	// The Message Authentication Code (MAC) / Authentication Tag
 	mac := ciphertextWithMac[len(ciphertextWithMac)-tagSize:]
 
+	fmt.Printf("content_encryption_nonce_bytes %x\n", content_encryption_nonce_bytes)
 	fmt.Printf("actualCiphertext %x\n", actualCiphertext)
 	fmt.Printf("ciphertextWithMac %x\n", ciphertextWithMac)
 	fmt.Printf("mac %x\n", mac)
@@ -759,39 +748,32 @@ func main() {
 				FullBytes:  ciphertextWithMac_parameter_bytes,
 				IsCompound: true,
 			}},
-		EncryptedContent: marshalEncryptedContent(actualCiphertext),
+		EncryptedContent: asn1.RawValue{Tag: 0, Class: asn1.ClassContextSpecific, Bytes: actualCiphertext, IsCompound: false},
 	}
 
-	//const der = "\xA0\x5D\x30\x18\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x09\x03\x31\x0B\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x07\x01\x30\x1C\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x09\x05\x31\x0F\x17\x0D\x31\x37\x30\x31\x31\x37\x30\x31\x33\x31\x32\x36\x5A\x30\x23\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x09\x04\x31\x16\x04\x14\x6C\x07\xE3\x58\x71\x40\x4C\xCB\x0F\xC3\xB2\xD9\xE8\x53\xC4\x8E\x87\x1D\x94\xD7"
-	// var attributes []Attribute
-	// brest, err := asn1.UnmarshalWithParams([]byte(der), &attributes, "set,tag:0")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// for _, attr := range attributes {
-	// 	fmt.Println(attr)
-	// }
-	// fmt.Println(brest)
+	/// you can embed the AAD into the cms message as the AuthAttrs
+	//  if you do the follwing, its fine but you can't 'view' the cms using openssl. see
+	//    [openssl/issues/26101](https://github.com/openssl/openssl/issues/26101)
 
-	// idaaintendedRecipients := asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 33}
+	idaaintendedRecipients := asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 33}
 
 	// //
-	// authAttr := Attribute{
-	// 	Type: idaaintendedRecipients,
-	// 	RawValue: []asn1.RawValue{{
-	// 		Class: asn1.ClassUniversal,
-	// 		Tag:   asn1.TagOctetString,
-	// 		Bytes: aad,
-	// 	},
-	// 	},
-	// }
+	authAttr := Attribute{
+		Type: idaaintendedRecipients,
+		RawValue: []asn1.RawValue{{
+			Class: asn1.ClassUniversal,
+			Tag:   asn1.TagOctetString,
+			Bytes: aad,
+		},
+		},
+	}
 
 	ed := AuthEnvelopedData{
 		Version:        0,
 		RecipientInfos: ri,
 		AECI:           eci,
 		MAC:            mac,
-		//AauthAttrs:     []Attribute{authAttr},
+		AauthAttrs:     []Attribute{authAttr},
 	}
 	edBytes, err := asn1.Marshal(ed)
 	if err != nil {
@@ -830,7 +812,137 @@ func main() {
 	}
 	ccertOut.Close()
 
+	fmt.Println()
+	fmt.Println()
+
 	/// *******************************************  RECEIVER *******************************************
+
+	fmt.Println("****************  RECEIVER **********************")
+	rcertblock, _ := pem.Decode(pemBytes)
+
+	var rcontentInfo ContentInfo
+	_, err = asn1.Unmarshal(rcertblock.Bytes, &rcontentInfo)
+	if err != nil {
+		log.Fatalf("Failed to unmarshal contentinfo %v", err)
+	}
+	fmt.Printf("ContentType %s\n", rcontentInfo.ContentType)
+
+	var rauthedInfo AuthEnvelopedData
+	_, err = asn1.Unmarshal(rcontentInfo.Content.Bytes, &rauthedInfo)
+	if err != nil {
+		log.Fatalf("Failed to unmarshal contentinfo %v", err)
+	}
+	fmt.Printf("ContenrauthedInfo.VersiontType %d\n", rauthedInfo.Version)
+
+	fmt.Printf("KEMRecipientInfo Alg %s\n", rauthedInfo.RecipientInfos.ORI.OriType)
+	//fmt.Printf("KEMRecipientInfo.KEMCipherText Alg %s\n", hex.EncodeToString(rauthedInfo.RecipientInfos.ORI.OriValue.KEMCipherText))
+
+	var rsharedSecret []byte
+	if rauthedInfo.RecipientInfos.ORI.OriValue.KEMAlgorithm.Algorithm.Equal(OID_MLKEM768) {
+		fmt.Println("Found MLKEM758 in private key")
+
+		dk, err := mlkem.NewDecapsulationKey768(alice_private_key_info.PrivateKey)
+		if err != nil {
+			log.Fatalf("Failed to create decryption key from private key %v", err)
+		}
+
+		rsharedSecret, err = dk.Decapsulate(rauthedInfo.RecipientInfos.ORI.OriValue.KEMCipherText)
+		if err != nil {
+			log.Fatalf("Failed to decapsulate %v", err)
+		}
+		fmt.Printf("recovered shared secret: kemShared %s \n", base64.StdEncoding.EncodeToString(rsharedSecret))
+	}
+
+	rEncryptedContentInfo := rauthedInfo.AECI
+
+	fmt.Printf("AuthEnvelopedData  %s\n", rEncryptedContentInfo.ContentEncryptionAlgorithm.Algorithm)
+
+	// now generate the kek
+
+	r_public_key_hash_b := sha1.Sum(alice_ml_kem_public_key_info.PublicKey.Bytes)
+	r_public_key_hash := r_public_key_hash_b[:]
+
+	fmt.Printf("expected spi %s\n", hex.EncodeToString(r_public_key_hash))
+
+	r_cori := CMSORIforKEMOtherInfo{
+		Wrap:      pkix.AlgorithmIdentifier{Algorithm: OID_AES_128_KEYWRAP},
+		KEKLength: 16, // aes 128 key
+		UKM:       nil,
+	}
+
+	r_coribytes, err := asn1.Marshal(r_cori)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("recalled CMSORIforKEMOtherInfo %s\n", hex.EncodeToString(r_coribytes))
+
+	rsalt := []byte("")
+	rkdf := hkdf.New(sha256.New, rsharedSecret, rsalt, r_coribytes)
+	rkek_derived_key := make([]byte, 16)
+	_, err = io.ReadFull(rkdf, rkek_derived_key)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("recalled KEK %s\n", hex.EncodeToString(rkek_derived_key))
+
+	// uwrap the encrypted content key using the kek_derived key
+
+	rkek_block, err := aes.NewCipher(rkek_derived_key)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	rencrypted_content_key, err := keywrap.Unwrap(rkek_block, rauthedInfo.RecipientInfos.ORI.OriValue.EncryptedKey)
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Printf("recalled encrypted_content_key %s\n", hex.EncodeToString(rencrypted_content_key))
+
+	/// decrypt the recalled_encypted_content_key
+
+	var raesGCM_parameters aesGCMParameters
+
+	_, err = asn1.Unmarshal(rEncryptedContentInfo.ContentEncryptionAlgorithm.Parameters.FullBytes, &raesGCM_parameters)
+	if err != nil {
+		log.Fatalf("Failed to unmarshal contentinfo %v", err)
+	}
+	fmt.Printf("content_encryption_nonce_bytes %x\n", raesGCM_parameters.Nonce)
+
+	rcontent_encryption_block, err := aes.NewCipher(rencrypted_content_key)
+	if err != nil {
+		panic(err.Error())
+	}
+	raesgcm, err := cipher.NewGCM(rcontent_encryption_block)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	///
+
+	var raad []byte
+	for _, a := range rauthedInfo.AauthAttrs {
+		//var rAuthAttribute Attribute
+		fmt.Printf("Attribute Type %s\n", a.Type.String())
+		for _, b := range a.RawValue {
+			raad = b.Bytes
+		}
+	}
+	fmt.Printf("Recalled AAD %s\n", raad)
+	// _ ,err = asn1.Unmarshal(rauthedInfo.AauthAttrs, rAuthAttribute)
+	// 	if err != nil {
+	// 		panic(err.Error())
+	// 	}
+	// 	fmt.Println(rauthedInfo.AauthAttrs[0].RawValue)
+	///
+
+	rCipherTextWithMac := append(rEncryptedContentInfo.EncryptedContent.Bytes, rauthedInfo.MAC...)
+
+	rplainText, err := raesgcm.Open(nil, raesGCM_parameters.Nonce, rCipherTextWithMac, raad)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	fmt.Printf("rplainText %s\n", rplainText)
 
 }
 

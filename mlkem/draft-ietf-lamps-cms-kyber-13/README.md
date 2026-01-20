@@ -8,6 +8,17 @@ Just an interpretation/implementation in go of
 
 > also, critically, stadnard go does **NOT** support parsing KEM public keys types.  The code below uses a modified `crypto/x509.go` described in [../issue_cert/x509.diff](../issue_cert/x509.diff)
 
+i.,e if you run the code as-is, you'll see the following because go doesn't understand mlkem public keys yet.  To 
+
+```bash
+$ go run main.go 
+****************  RECEIVER **********************
+generate key and issue x509
+Creating public x509
+Failed to create certificate: x509: unsupported public key type: *x509.MLKEMPublicKeyInfo
+exit status 1
+```
+
 the code here just does something very simple: it just uses a static KEM public/private key, a static aes key and nonce to generate a cms.
 
 
@@ -111,51 +122,98 @@ CMS_ContentInfo:
 
 
 ```bash
+### go to the `issue_cert` filder and apply the diff to the custom go release
+# cd ../issue_cert
+# git clone --branch go1.25.1 --single-branch --depth 1 https://github.com/golang/go.git goroot
+
+# cd goroot
+# git apply ../x509.diff
+# git apply ../version.diff
+
+# cd src/
+# ./make.bash
+
+# cd ../../
+# export GOROOT=`pwd`/goroot
+# export PATH=$GOROOT/bin:$PATH
+
+## notice you'll see the modified version of go
+
+# $ goroot/bin/go version go1.25.1-mod linux/amd64
+
+
 $ go run main.go 
 
-Creating public x509wrote issued.pem
+****************  RECEIVER **********************
+generate key and issue x509
+Creating public x509
+wrote issued.pem
+
+
+****************  SENDER **********************
 SubjectKeyId cf51cc7c3eb2b06d6da02a0fab7f7c86af840a78
-Issuer and serialNumber 304c310b3009060355040613025553310f300d060355040a0c06476f6f676c6531133011060355040b0c0a456e74657270726973653117301506035504030c0e53696e676c6520526f6f74204341021015f017052db5bdc261640e6997676851
-kemcipherText d0c9e70340846b903e452a422d11fd5fb0722992353464c68fc9bd066c06a8964c960fd404f2dbd21d0f348345cfa338fb6f901b2bc65060185188b6388bd47c9c3dec85b8bbeba7c4c1caa3f6d00f3e147432ff10891e0a0e6729ba3f5c907ce2aa21c36885f051d35c5cca2de8b92b236e2742948cb2a36594dd1e78df7a50a2a37b37af6f4cc95c644fc60af613347a8f7e491c3b1ca2c52c0b6898307143db4a6b92019b142aafc3e2fcdfbb94f3273ee0460f0537df00bd8e99389ca74e4adf973d200e0a9db81d6d51f858d2fc2f2f1d8933288bc6b0f9304675a2cd1c462d6d321da0c729fb1d03d3b081f446763d6245a2be3dccc57f410a1394bdece63c1cbca98431db767a6288a15a997c042921965ca522de6d6f61a866132d1646da99aa5f9cbb1e16cc4c3e1895dea0b8ebd23f36da069a0f2d42c8d013253395080b8e986d81496dbd5b9d6c1d15b1c20897bd0ae366eb636290cacc7171eb85723319bfbc9f3f260f36e4f972526ec1c20e851fbeb8ab165a3fb15f49fbc90e1fed017e333ab7cfa8aef4196a3527ef8a69e9c5100a961ea6a0e17dad2156c5f5a1708c3b5e23199bfbd4d1c0717b1816f428ff164a41d41aa2766e486e1cffb5ea75f20f07694e7c2763e817a891a0ea574383c1342cad14413e5c3e16b09eb778a25bdfcda2fccda3a84030942e30683023d2635cb2badf42b69f9fcd21d40265759d69909d11cf6908c0a31744c67bbd893ac09f0f9c5ab1bdb3bead0e5f4be1c8a1081d64b87a25fd898ff62c7762baae7acd762bc0996d238c487c47ef5a46c472e506f551e5e74282e895a49484d30cd6fb798030b4ed040ccf5f0127e2b2acb52e9023d462c80596113aedbc15a634b9725c4009100679fbd48882b350f5a9ff53d37c6dd56164ae753f073d452301bf3de87169a477fa632cd25d741a82ead7020d48704ebeefe5b67e742c801979be9f415bb9ac3f38d80493d95fcf00b2b5890351385c4b34edfff1d2ea883ebbde62cfb06c284d1893f35c36ceb0cd41b5241a7c7577424e06028fd25b68652587a3ba8e433ca88c452613ef4817d24e660e32755c6ae415a661df2bf1965b7bf59a03e0bf3c74ef0462a4e04179870b51385e7f808cc09552864d7c923239433fbdaf72520e5e5537410cf4f5c45cecbc584570ec293e73cfdff1e4c92e56ffc05ef8991de081d4bb3872c2acd306952de73a0c0566ee725c25a715918af73e4ce7b6b5c18ce95fdd5825f96a17ea309de22832ada8a59a1b7bcb4a5b9ff9f90dcad88ddf4bc6a16c15ba53a79b2373ecbe61d56d0f8c7fe6a71a827afa1d95bef55710bbe9aec1ebd85107d02c9c687ddf1d0bad7457f0434809ec5b10f018d696b270da5f5a5dcd8876106cb317c86fc96bb1947e6f9cf5b5302b5b7f975f29abe3e342ca4e0f877af835ea244c3ea1336c42b2c38a90b29b715700dd947264497e187da5c4779184649cfe14881b3d70e9526172f484922ee75a340d2c676fce84ea819af429a9168387
-SharedSecret: kemShared (GhXJBcSnBJyAQNuJ2bo7aJX2+oLpSSRi3WHwMiBOAgY=) 
-root_key rWG5+kTRNuAeyIoCd5Zg3EPg5BCgdRdpWhnWMGVwqmw= 
+Issuer and serialNumber 304c310b3009060355040613025553310f300d060355040a0c06476f6f676c6531133011060355040b0c0a456e74657270726973653117301506035504030c0e53696e676c6520526f6f742043410210694ca09814e950c4bf8247c7cded7780
+kemcipherText 5c291fb8b61e1e2d3b32c0d8bbde4c0a902452ca3de546eb51fd02bfc4dfdebe48d1213c3aca2f9aec1f0417c331fbebe6f67939e87c03ef20f661ce56a21b8dd440cff8a2635d8a90a2cc276c8eaf4f7ea92a92bec4a1070f60140196743ed1ba2196077590cc52e33c8bd70a5070955ff651d76f13804204e7465d531cc568ecccd24de98886003c1ddac7ff39fdde59efc61914d0ad57d210f52a5f54592de93a7e8429f085d9a7d167e4d24c8cc8258c09da30b5d22416c3b98321888a9f6ffe5f33ac645b1969c69294a916404d7dbd509ff872bf9023299cea425bddd12e7d601f370e059bd279d8ea6a25c540a384f1b2a4f8caf5d69d02682c330ab49d7962406b40bb85a89c92bc30d994bcb7739efb1d3b5cdc1397355619ed64389304c624acebdfdb5fb1dcd5f15a08d4f653cf2dcae38ea1c86a1556fccf49fb962568caba8f89af560b70cc72cc0595ca11b7e521d8eeada6d5f24b1d69c21419cf4398df25f84ba6c1c4cc4c40b2a3d0bbfd8e51821b13a921fb074eac7ea01cca3bf73e9f4bcd9d54deed73785e64e462ba92f7e97d2eb0b1aee9576ab969aaa6187e25236b469622d860b674de676acac01864477508af3251eecbee56a4efe1e1b608018afad1efb2f23da6a67ef0f896f144316b77355b94a542877674d20ffecf52158acea6da6e2207b2cc613d9243047576fe997772953b2be0ed9920ed2d793508efc81ac206da0546539f4aaa1c017c69090ee2f3d5c6383a708acef3789f56350a5c075589a371fefc3bcf6167c4834f5bdd4c8de1089f6e1f4366c6dc89c40efcd7238dfd56481c4d8918f20aeedd014d9316f0c0b82defd6850fad4af087abed3f3a1d76a4ac922262001d7eccce415e1152ba688b3a73c66750c6c4efc9024851d7959fb46254f0825b3d838143576586f6641143f15752e7625cd25863c3ca29e44bc3555c7ece58ffaf56fcdfaf7c37ddc22884a04e95cedaad0b30c4702560ac733c1e80c4100237508760250d2b2867547999ab8385deb99007534f0b018fcb98547419dd931a0ce6b87fcb66d64cc085ba88f4c543c9254a087ee733db71bd3c434815b756504e8e88b131970c70e6b5d7f9a68281ff68362a625abded1dc9df1ae782e7dbcd70f16de46bbd92bb28428b918144a742ef9d5dbbbb4ad80109d9f0f2a6a549c1ff71fc7c88ebcc74448764074c3dff8826274932dabb7b3b8cafc10155b1f246211c1be279f9007d1326593b04362dfddc6e9adf8d4854a785dc44992325b7cff8304da0dc2f975041c84412a82b337113920bff361e41bfe3af9774cf99fb6e122f14ec8d445058527678999020b538252d291b80da833e9981df580be881dd1530a20de243e717e445750fba2cbbbd32be44a120abd2bd87a3e94d4748fc9418fc1d657d8c334dce43716a2c78189bd1b9f981b00e69bd82669aa1def5bd1fed2fdda11d7d58d74a87e28695f49b7bea9b0418a47911bcda6c71eb1fbd55a1b3ab5283a882c0fa241108d69eac384b
+SharedSecret: kemShared daLaj1QxJx9mHbpwKAvqYeSStzmIXKMteNjpldmw5ys= 
+root_key KqgLx3sbo1a2ezqfhSUIlEdU3KK5z73DRZJDQxYmlUg= 
 spi cf51cc7c3eb2b06d6da02a0fab7f7c86af840a78
 CMSORIforKEMOtherInfo 3010300b0609608648016503040105020110
-KEK 8d013e0ce043e9a90b0f5551b77cd0bc
-actualCiphertext 920ed86499f2325c86791e6a62
-ciphertextWithMac 920ed86499f2325c86791e6a62672b7502b948b22c6b627161d89bee29
-mac 672b7502b948b22c6b627161d89bee29
+KEK 140da405e94f58f340574e98fdc4c88f
+encrypted_content_key f668befb2a85c735ff05e7eef0d97deb85d26755fd428d09180026b15304613a65314fc45c423b27
+content_encryption_nonce_bytes af00b9df86d93d8a7479c87e
+actualCiphertext 53148f804aa9547c9084cf747a
+ciphertextWithMac 53148f804aa9547c9084cf747ad4faf908e09a1105d99e478883a27fd0
+mac d4faf908e09a1105d99e478883a27fd0
 tagSize 16
 -----BEGIN CMS-----
-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
+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
++QjgmhEF2Z5HiIOif9A=
 -----END CMS-----
+
+
+
+****************  RECEIVER **********************
+ContentType 1.2.840.113549.1.9.16.1.23
+ContenrauthedInfo.VersiontType 0
+KEMRecipientInfo Alg 1.2.840.113549.1.9.16.13.3
+Found MLKEM758 in private key
+recovered shared secret: kemShared daLaj1QxJx9mHbpwKAvqYeSStzmIXKMteNjpldmw5ys= 
+AuthEnvelopedData  2.16.840.1.101.3.4.1.6
+expected spi cf51cc7c3eb2b06d6da02a0fab7f7c86af840a78
+recalled CMSORIforKEMOtherInfo 3010300b0609608648016503040105020110
+recalled KEK 140da405e94f58f340574e98fdc4c88f
+recalled encrypted_content_key 7b023af1f41f280588b9af6762d79dbeab6958235090f0cf8813a0848e16d612
+content_encryption_nonce_bytes af00b9df86d93d8a7479c87e
+Attribute Type 1.2.840.113549.1.9.16.2.33
+Recalled AAD foo
+rplainText Hello, world!
 ```
 
 
@@ -163,33 +221,9 @@ v/ACARCADwQNkg7YZJnyMlyGeR5qYgQQZyt1ArlIsixrYnFh2JvuKQ==
 
 TODO:
 
-AAD text is supposed to get encoded into the envelope as authenticated attributes like so:
+AAD text is supposed to get encoded into the envelope as authenticated attributes but unfortunately,  openssl uses the wrong tag value  [openssl/issues/26101](https://github.com/openssl/openssl/issues/26101)
 
-```golang
-	idaaintendedRecipients := asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 33}
-
-	//
-	authAttr := Attribute{
-		Type: idaaintendedRecipients,
-		RawValue: []asn1.RawValue{{
-			Class: asn1.ClassUniversal,
-			Tag:   asn1.TagOctetString,
-			Bytes: aad,
-		},
-		},
-	}
-
-	ed := AuthEnvelopedData{
-		Version:        0,
-		RecipientInfos: ri,
-		AECI:           eci,
-		MAC:            mac,
-		AauthAttrs:     []Attribute{authAttr},
-	}
-
-```
-
-however, while i can encode it into the PEM, i can't figure out how to make openssl parse it, i keep seeing `wrong_tag`:
+and you'll see the following error
 
 ```bash
 $ openssl cms -cmsout -print -noout -inform PEM -in c.cms 
@@ -201,5 +235,18 @@ Error reading SMIME Content Info
 80ABE529AF7F0000:error:0688010A:asn1 encoding routines:asn1_template_ex_d2i:nested asn1 error:crypto/asn1/tasn_dec.c:537:Field=d.authEnvelopedData, Type=CMS_ContentInfo
 ```
 
+as a workaround i modified the local asn parsing tage `main.go` to compensate for this just so i can parse it with openssl
 
-which after a bit of fiddling found out openssl uses the wrong tag value  [openssl/issues/26101](https://github.com/openssl/openssl/issues/26101)
+ofcourse you don't have to make this change if you don't want to "see" the structure with openssl...
+
+```golang
+type AuthEnvelopedData struct {
+	Version        int
+	OriginatorInfo asn1.RawValue `asn1:"optional,implicit,tag:0"`
+	RecipientInfos RecipientInfo `asn1:"set,implicit"`
+	AECI           EncryptedContentInfo
+	AauthAttrs     []Attribute `asn1:"set,optional,implicit,tag:2"` /// <<< modified from 1 to 2 to accoodate  https://github.com/openssl/openssl/issues/26101
+	MAC            []byte
+	UnAauthAttrs   []Attribute `asn1:"set,optional,implicit,tag:3"` /// <<< modified from 2 to 3 to accoodate  https://github.com/openssl/openssl/issues/26101
+}
+```

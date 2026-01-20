@@ -73,7 +73,7 @@ type EnvelopedData struct {
 //	  oriValue ANY DEFINED BY oriType }
 type OtherRecipientInfo struct {
 	OriType  asn1.ObjectIdentifier
-	OriValue interface{} `asn1:"implicit"` // // `asn1:"optional"` // asn1.RawValue
+	OriValue KEMRecipientInfo //interface{} `asn1:"implicit"` // // `asn1:"optional"` // asn1.RawValue
 }
 
 //  CMSORIforKEMOtherInfo ::= SEQUENCE {
@@ -249,10 +249,21 @@ type IssuerAndSerialNumber struct {
 	SerialNumber *big.Int
 }
 
-type pkixPrivKey struct {
-	Version    int
-	Algorithm  pkix.AlgorithmIdentifier
-	PrivateKey []byte
+//	PrivateKeyInfo ::= SEQUENCE {
+//	  version                   Version,
+//	  privateKeyAlgorithm       PrivateKeyAlgorithmIdentifier,
+//	  privateKey                PrivateKey,
+//	  attributes           [0]  IMPLICIT Attributes OPTIONAL }
+//
+// Version ::= INTEGER
+// PrivateKeyAlgorithmIdentifier ::= AlgorithmIdentifier
+// PrivateKey ::= OCTET STRING
+// Attributes ::= SET OF Attribute
+type PrivateKeyInfo struct {
+	Version             int
+	PrivateKeyAlgorithm pkix.AlgorithmIdentifier
+	PrivateKey          []byte      `asn1:""`                            // The actual key data, an OCTET STRING
+	Attributes          []Attribute `asn1:"optional,tag:0,implicit,set"` // Optional attributes
 }
 
 // type pkixPubKey struct {
@@ -272,11 +283,6 @@ type RecipientIdentifier struct {
 type aesGCMParameters struct {
 	Nonce  []byte //`asn1:"tag:4"`
 	ICVLen int
-}
-
-func marshalEncryptedContent(content []byte) asn1.RawValue {
-	asn1Content, _ := asn1.Marshal(content)
-	return asn1.RawValue{Tag: 0, Class: asn1.ClassContextSpecific, Bytes: asn1Content, IsCompound: false}
 }
 
 var (
@@ -400,6 +406,7 @@ func main() {
 
 	//*********************** RECEIVER *************************************
 	// read recepients public private key
+	fmt.Println("****************  RECEIVER **********************")
 
 	pubPEMblock, rest := pem.Decode([]byte(kemPublic))
 	if len(rest) != 0 {
@@ -407,8 +414,8 @@ func main() {
 		return
 	}
 	//var pkixa pkixPubKey
-	var pkixa x509.MLKEMPublicKeyInfo
-	if rest, err := asn1.Unmarshal(pubPEMblock.Bytes, &pkixa); err != nil {
+	var r_MLKEMPublicKeyInfo x509.MLKEMPublicKeyInfo
+	if rest, err := asn1.Unmarshal(pubPEMblock.Bytes, &r_MLKEMPublicKeyInfo); err != nil {
 		panic(err)
 	} else if len(rest) != 0 {
 		fmt.Printf("rest not nil")
@@ -420,8 +427,8 @@ func main() {
 		fmt.Printf("trailing data found during pemDecode")
 		return
 	}
-	var prkix pkixPrivKey
-	if rest, err := asn1.Unmarshal(privPEMblock.Bytes, &prkix); err != nil {
+	var r_PrivateKeyInfo PrivateKeyInfo
+	if rest, err := asn1.Unmarshal(privPEMblock.Bytes, &r_PrivateKeyInfo); err != nil {
 		panic(err)
 	} else if len(rest) != 0 {
 		fmt.Printf("rest not nil")
@@ -430,15 +437,15 @@ func main() {
 
 	// read in a dummy CA certificate an dkey
 
-	block, _ := pem.Decode([]byte(caPublicCert))
-	caCert, err := x509.ParseCertificate(block.Bytes)
+	ca_public_block, _ := pem.Decode([]byte(caPublicCert))
+	ca_cert, err := x509.ParseCertificate(ca_public_block.Bytes)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	rkblock, _ := pem.Decode([]byte(caPrivate))
+	ca_private_block, _ := pem.Decode([]byte(caPrivate))
 
-	priv, err := x509.ParsePKCS8PrivateKey(rkblock.Bytes)
+	ca_private, err := x509.ParsePKCS8PrivateKey(ca_private_block.Bytes)
 	if err != nil {
 		log.Fatalf("Unable to get read private ocsp key: %v", err)
 	}
@@ -454,7 +461,7 @@ func main() {
 			CommonName:         "recepient1",
 		},
 		DNSNames:  []string{"recipient1"},
-		PublicKey: &pkixa, // <<<<<<<<<<<<<< kem public key
+		PublicKey: &r_MLKEMPublicKeyInfo, // <<<<<<<<<<<<<< kem public key
 	}
 
 	// csrBytes, err := x509.CreateCertificateRequest(rand.Reader, &csrtemplate, nkp)
@@ -486,7 +493,7 @@ func main() {
 	// calculate skid
 	// The actual key bytes are in pubKeyInfo.PublicKey.Bytes.
 	// Hash these bytes using SHA-1.
-	hash := sha1.Sum(pkixa.PublicKey.Bytes)
+	hash := sha1.Sum(r_MLKEMPublicKeyInfo.PublicKey.Bytes)
 	sk := hash[:]
 
 	// now create a certificate and sign it.
@@ -512,7 +519,7 @@ func main() {
 		IsCA:                  false,
 	}
 
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, caCert, csrtemplate.PublicKey, priv.(*rsa.PrivateKey))
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, ca_cert, csrtemplate.PublicKey, ca_private.(*rsa.PrivateKey))
 	if err != nil {
 		log.Fatalf("Failed to create certificate: %s", err)
 	}
@@ -526,8 +533,11 @@ func main() {
 	certOut.Close()
 	fmt.Print("wrote issued.pem\n")
 
-	//*********************** SENDER *************************************
+	fmt.Println()
+	fmt.Println()
 
+	//*********************** SENDER *************************************
+	fmt.Println("****************  SENDER **********************")
 	// now
 	// read the recipeents x509
 	issuedEKMCert, err := x509.ParseCertificate(derBytes)
@@ -538,7 +548,7 @@ func main() {
 	// first verify the CA issued it
 
 	issuerPool := x509.NewCertPool()
-	issuerPool.AddCert(caCert)
+	issuerPool.AddCert(ca_cert)
 
 	verifyOptions := x509.VerifyOptions{
 		Roots: issuerPool,
@@ -551,28 +561,28 @@ func main() {
 
 	// now get the public key from the cert and get its hash
 
-	publicKeyDER, err := x509.MarshalPKIXPublicKey(issuedEKMCert.PublicKey)
+	s_recalled_KEM_public, err := x509.MarshalPKIXPublicKey(issuedEKMCert.PublicKey)
 	if err != nil {
 		log.Fatalf("Error marshaling public key to DER: %v", err)
 	}
 
-	var pkixaa x509.MLKEMPublicKeyInfo
-	if rest, err := asn1.Unmarshal(publicKeyDER, &pkixaa); err != nil {
+	var s_recalled_MLKEMPublicKeyInfo x509.MLKEMPublicKeyInfo
+	if rest, err := asn1.Unmarshal(s_recalled_KEM_public, &s_recalled_MLKEMPublicKeyInfo); err != nil {
 		panic(err)
 	} else if len(rest) != 0 {
 		fmt.Printf("rest not nil")
 		return
 	}
 
-	phash := sha1.Sum(pkixaa.PublicKey.Bytes)
-	phashk := phash[:]
+	s_recalled_MLKEMPublicKeyInfo_public := sha1.Sum(s_recalled_MLKEMPublicKeyInfo.PublicKey.Bytes)
+	s_recalled_MLKEMPublicKeyInfo_public_hash := s_recalled_MLKEMPublicKeyInfo_public[:]
 	// compare if the issued cert matches the subjectKeyID
-	if !bytes.Equal(phashk, issuedEKMCert.SubjectKeyId) {
+	if !bytes.Equal(s_recalled_MLKEMPublicKeyInfo_public_hash, issuedEKMCert.SubjectKeyId) {
 		fmt.Println("SubjectKeyID does not match hash of the public key")
 		return
 	}
 
-	fmt.Printf("SubjectKeyId %s\n", hex.EncodeToString(phashk))
+	fmt.Printf("SubjectKeyId %s\n", hex.EncodeToString(s_recalled_MLKEMPublicKeyInfo_public_hash))
 
 	ie, err := NewIssuerAndSerialNumberRaw(issuedEKMCert)
 	if err != nil {
@@ -616,24 +626,6 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("root_key %s \n", base64.StdEncoding.EncodeToString(payload_encryption_key))
-
-	bobpubPEMblock, rest := pem.Decode([]byte(kemPublic))
-	if len(rest) != 0 {
-		fmt.Printf("trailing data found during pemDecode")
-		return
-	}
-	//var pkixa pkixPubKey
-	var bobpkixa x509.MLKEMPublicKeyInfo
-	if rest, err := asn1.Unmarshal(bobpubPEMblock.Bytes, &bobpkixa); err != nil {
-		panic(err)
-	} else if len(rest) != 0 {
-		fmt.Printf("rest not nil")
-		return
-	}
-	bhash := sha1.Sum(bobpkixa.PublicKey.Bytes)
-	bsk := bhash[:]
-
-	fmt.Printf("spi %s\n", hex.EncodeToString(bsk)) // should give 599788C37AED400EE405D1B2A3366AB17D824A51
 
 	cori := CMSORIforKEMOtherInfo{
 		Wrap:      pkix.AlgorithmIdentifier{Algorithm: OID_AES_128_KEYWRAP},
@@ -751,7 +743,7 @@ func main() {
 		// for SubjectKeyIdentifier
 		Recipient: asn1.RawValue{
 			Tag:   asn1.TagOctetString,
-			Bytes: phashk,
+			Bytes: s_recalled_MLKEMPublicKeyInfo_public_hash,
 		},
 		KEMAlgorithm:  pkix.AlgorithmIdentifier{Algorithm: OID_MLKEM512},
 		KEMCipherText: kemcipherText,
@@ -784,7 +776,7 @@ func main() {
 				FullBytes:  ciphertextWithMac_parameter_bytes,
 				IsCompound: true,
 			}},
-		EncryptedContent: marshalEncryptedContent(actualCiphertext),
+		EncryptedContent: asn1.RawValue{Tag: 0, Class: asn1.ClassContextSpecific, Bytes: actualCiphertext, IsCompound: false},
 	}
 
 	ed := AuthEnvelopedData{

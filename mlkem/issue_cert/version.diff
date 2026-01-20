@@ -1,0 +1,9 @@
+diff --git a/VERSION b/VERSION
+index cf1f2f4..57874b5 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1,2 +1,2 @@
+-go1.25.1
+-time 2025-08-27T15:49:40Z
++go1.25.1-mod
++time 2026-01-19T15:49:40Z
