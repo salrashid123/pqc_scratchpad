@@ -12,6 +12,15 @@ This repo is just a collection of `PQC` tools and sample code.
   - [JWT Signature](#jwt-signature)
   - [Google Cloud KMS PQC signature verification](#google-cloud-kms-pqc-signature-verification) 
 * [MLKEM](#mlkem)
+  - [Using standard go library](#mlkem-standard-go)
+  - [Using circl library](#mlkem-circl)
+  - [JSON Web Encryption (JWE)](#mlkem-json-web-encryption)
+  - [Source random from Trusted Platform Module](#mlkem-tpm)
+  - [Parse openssl PEM keys](#mlkem-parse-pem-keys)
+  - [Issue x509 MLKEM Certificate](#mlkem-x509)
+  - [MLKEM with Cryptographic Message Syntax (CMS)](#mlkem-cms-rfc9629)
+  - [MLKEM Python](#mlkem-python)
+  - [MLKEM CMS](#mlkem-cms)
 * [SLH-DSA](#slh-dsa)
 * [Openssl key formats](#openssl-key-formats)
   - [ML-KEM Format](#ml-kem-format)
@@ -34,6 +43,7 @@ shameless plug by the author
 
 * [AEAD encryption using Post Quantum Cryptography (ML-KEM)](https://github.com/salrashid123/go-pqc-wrapping)
 * [Python AEAD encryption using Post Quantum Cryptography (ML-KEM)](https://github.com/salrashid123/python_pqc_wrapping)
+* [Json Web Encryption (JWE) using Post Quantum Cryptography (ML-KEM)](https://github.com/salrashid123/jwe-pqc)
 * [golang-jwt for post quantum cryptography](https://github.com/salrashid123/golang-jwt-pqc)
 * [OCICrypt Container Image Post Quantum Cryptography Provider](https://github.com/salrashid123/ocicrypt-pqc-keyprovider)
 * [Generate MLKEM key using Trusted Platfrom Module as random number generator](https://gist.github.com/salrashid123/761101aa94e9b26b114390fd966b1358)
@@ -229,6 +239,9 @@ Key Encapsulation [ML-KEM](https://csrc.nist.gov/pubs/fips/203/final)
 
 ![images/key_exchange.png](images/key_exchange.png)
 
+### MLKEM Parse PEM Keys
+
+To use openssl to generate keys and parse them, see the following and the example in go under `mlkem/openssl_parse`
 
 ```bash
 ## generate a key as 'seed-only'
@@ -247,12 +260,74 @@ openssl pkeyutl -decap -inkey priv-ml-kem-768-bare-seed.pem  -in /tmp/ctext.dat 
   ca08986c403dec7505bfcb214ad53c9a9af24d1547f5c87f74b785699b7eb94c
 ```
 
+### MLKEM standard go
+
 For golang, you can use `crypto/mlkem` package.  The following shows how to generate and arrive at shared keys
 
 ```bash
 $ go run default/main.go 
   SharedSecret: kemShared (2dae99717ffe984dac326f695a28eaea4cb314addc9000d7c8ea19a53ce06062) 
   SharedSecret: kemShared (2dae99717ffe984dac326f695a28eaea4cb314addc9000d7c8ea19a53ce06062) 
+```
+
+### MLKEM CIRCL library
+
+For golang, you can also use `"github.com/cloudflare/circl/kem/mlkem/mlkem768"` package though i don't know how to convert the keys back into a compatible format
+
+### MLKEM JSON Web Encryption
+
+see 
+
+* [Json Web Encryption (JWE) using Post Quantum Cryptography (ML-KEM)](https://github.com/salrashid123/jwe-pqc)
+
+### MLKEM CIRCL library
+
+### MLKEM x509
+
+at the time of writing 3/15/26, You can issue an mlkem x509 by **Overriding** standard go's crypto/x509 library (note this isn't recommended becasue its an override)...but just to see it, look at the `mlkem/issue_cert` folder
+
+### MLKEM cms rfc9629
+
+If you wanted to issue issue a cryptographic message formatted as the RFC9629, see the `mlkem/rfc9629` foldder
+
+### MLKEM CMS
+
+If you wanted to see a draft CMS format specific to MLKEM, see the `mlkem/draft-ietf-lams-cms-kyber-13` folder
+
+### MLKEM Python
+
+For an example in python, see `mlkem/python` folder`
+
+### MLKEM TPM
+
+Finally,  you can use a TPM to generate the keyapir.  See the `mlkem/tpm` folder
+
+the idea is that the `d`, `z` parameters are random values from a TPM and fed into the algorithm here:
+
+* [Module-Lattice-Based Key-Encapsulation Mechanism Standard](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.203.pdf)
+
+
+
+```
+7.1 ML-KEM Key Generation
+The key generation algorithm ML-KEM.KeyGen for ML-KEM (Algorithm 19) accepts no input,
+generates randomness internally, and produces an encapsulation key and a decapsulation key.
+While the encapsulation key can be made public, the decapsulation key shall remain private.
+The seed (𝑑,𝑧) generated in steps 1 and 2 of ML-KEM.KeyGen can be stored for later expansion using ML-KEM.KeyGen_internal (see Section 3.3). As the seed can be used to compute
+the decapsulation key, it is sensitive data and shall be treated with the same safeguards as a
+decapsulation key (see SP 800-227 [1]).
+Algorithm 19 ML-KEM.KeyGen()
+Generates an encapsulation key and a corresponding decapsulation key.
+
+Output: encapsulation key ek ∈ 𝔹384𝑘+32.
+Output: decapsulation key dk ∈ 𝔹768𝑘+96. $
+
+1: 𝑑 ←− 𝔹32 ▷ 𝑑 is 32 random bytes (see Section 3.3) <<<<<<<<<<<<<<<
+2: 𝑧 ←− 𝔹32 ▷ 𝑧 is 32 random bytes (see Section 3.3) <<<<<<<<<<<<<<<
+3: if 𝑑 == NULL or 𝑧 == NULL then
+4: return ⊥ ▷ return an error indication if random bit generation failed
+5: end if
+6: (ek,dk) ← ML-KEM.KeyGen_internal(𝑑,𝑧) ▷ run internal key generation algorithm
 ```
 
 ## SLH-DSA
