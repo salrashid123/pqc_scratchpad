@@ -27,6 +27,7 @@ This repo is just a collection of `PQC` tools and sample code.
   - [ML-DSA Format](#ml-dsa-format)
   - [PEM Key Conversion](#pem-key-conversion)
   - [Python PEM](#python-pem)
+  - [crypto/mldsa package](#crypto-mldsa)
 * [TLS](#tls)
   - [curl](#curl)
 * [PKI](#pki)
@@ -591,6 +592,13 @@ bare seed from pem private key 67e6bc81c846808002ced71bbf8a8c4195af2a37614c4c81c
 Decoded subjectPublicKey:
 Shared secretes coincide: True
 ```
+### Crypto MLDSA
+
+the `mldsa/std_go` folder contains a sample application which exercises the proposal [#77626](https://github.com/golang/go/issues/77626)
+
+It uses code from [https://github.com/FiloSottile/mldsa](https://github.com/FiloSottile/mldsa)
+
+Eventually, this will be in the standard go branch so I'll update the samples here as well as update `golang-jwt-pqc` 
 
 ## TLS
 
