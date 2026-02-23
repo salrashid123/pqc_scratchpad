@@ -62,24 +62,6 @@ Digital Signatures using [ML-DSA](https://csrc.nist.gov/pubs/fips/204/final)
 * [EVP_PKEY-ML-DSA](https://github.com/openssl/openssl/blob/master/doc/man7/EVP_PKEY-ML-DSA.pod)
 
 
-Using `openssl3.5.0` (if you don't have that version, use the dockerfile below)
-
-```bash
-## using the 'bare-seed' PEM format for the private key
-openssl genpkey -algorithm ML-DSA-44 -provparam ml-dsa.output_formats=bare-seed   -out private.pem
-openssl pkey -in private.pem -pubout -out public.pem
-
-echo -n "bar" > /tmp/data.in.raw
-openssl dgst -sign private.pem -out /tmp/data.out.signed /tmp/data.in.raw 
-openssl dgst -verify public.pem -signature /tmp/data.out.signed  /tmp/data.in.raw  
-```
-
-For golang, `ML-DSA` isn't implemented yet at time of writing so we're using CloudFlares one here `github.com/cloudflare/circl/sign/mldsa/mldsa44`.
-
-
->> **Note** that `github.com/cloudflare/circl/sign/mldsa/mldsa6` by default generates the `seed-only` private key format (key prefix `8020`) 
-** and prepends** a PEM type of of `BEGIN ML-DSA-65 PRIVATE KEY`, the latter which is apparently incompatible with openssl
-
 
 ```bash
 $ cat seed-only.pem 
@@ -222,6 +204,26 @@ This will
   * [issue#535:openssl parsing compatiblity issue for MLDSA](https://github.com/cloudflare/circl/issues/535)
 5. Verify the signature using the public key
 
+### x509 Certificate
+
+To issue x509 with openssl
+
+Using `openssl3.5.0` (if you don't have that version, use the dockerfile below)
+
+```bash
+## using the 'bare-seed' PEM format for the private key
+openssl genpkey -algorithm ML-DSA-44 -provparam ml-dsa.output_formats=bare-seed   -out private.pem
+openssl pkey -in private.pem -pubout -out public.pem
+
+echo -n "bar" > /tmp/data.in.raw
+openssl dgst -sign private.pem -out /tmp/data.out.signed /tmp/data.in.raw 
+openssl dgst -verify public.pem -signature /tmp/data.out.signed  /tmp/data.in.raw  
+```
+
+At the time of writing (2/22), golang doesn't support mldsa yet and its on the roadmap.
+
+```
+```
 
 
 ## MLKEM
@@ -679,6 +681,8 @@ Header:
       Signature Algorithm: mldsa44 (0x0904) 
       Signature (len=2420): 0A86BE0E95077266EB0....
 ```
+
+For TLSLogs, see [mldsa/tls_logs](mldsa/tls_logs)
 
 ### curl
 

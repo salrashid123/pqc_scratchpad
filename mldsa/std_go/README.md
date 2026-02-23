@@ -69,3 +69,18 @@ openssl dgst -verify public.pem -signature data.out.signed  data.in.raw
 ## verify with go golang generated signature
 openssl dgst -verify public.pem -signature signature.dat  data.in.raw 
 ```
+
+
+---
+
+
+##### External mu
+
+* [https://www.rfc-editor.org/rfc/rfc9881.html#externalmu](https://www.rfc-editor.org/rfc/rfc9881.html#externalmu)
+
+
+from [https://github.com/golang/go/issues/77626#issuecomment-3934109377](https://github.com/golang/go/issues/77626#issuecomment-3934109377)
+
+```md
+Why a crypto.Hash for External μ? μ is H(H(pubkey) || 0x00 || len(context) || context || message). See “Pre-Hashing (Externalμ-ML-DSA)” in RFC 9881. We could have an Options field to specify the message is a μ, but 1. it’s more likely crypto.Signer implementations will ignore it like RSA ones ignore PSSOptions, 2. it’s not clear External μ verification is safe so we should not support it, and 3. it would be mutually exclusive with Context. We could have a separate SignExternalMu method, but then there would be no established way to use a hardware implementation through crypto.Signer, which is what External μ is for. In a sense, μ computation is a weird, specific hash function which preprocesses the crypto.Signer input, and that’s what crypto.Hash represents. There is precedent in sentinel crypto.Hash values without implementation in crypto.MD5SHA1.
+```

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"crypto"
 	"crypto/mldsa"
+	"crypto/sha3"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"encoding/hex"
 	"encoding/pem"
 	"flag"
 	"fmt"
@@ -12,10 +15,6 @@ import (
 )
 
 const ()
-
-var (
-	mlkem758OID = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 2}
-)
 
 //	PrivateKeyInfo ::= SEQUENCE {
 //	  version                   Version,
@@ -64,6 +63,7 @@ var (
 	data         = flag.String("data", "foo", "data to sign")
 	publicOut    = flag.String("public", "public.pem", "public key")
 	privateOut   = flag.String("private", "private.pem", "private key")
+	signContext  = flag.String("signContext", "mycontext", "signcontext")
 	signatureOut = flag.String("signature", "signature.dat", "signature file")
 )
 
@@ -99,13 +99,13 @@ func main() {
 	fmt.Print("wrote private.pem\n")
 
 	// get cypto.publickey
-	publicKey := pr.Public()
-	mp, ok := publicKey.(*mldsa.PublicKey)
-	if !ok {
-		fmt.Println("Error converting to mldsa.PublicKey")
-		return
-	}
-	fmt.Println(mp.Equal(pr.PublicKey()))
+	// publicKey := pr.Public()
+	// mp, ok := publicKey.(*mldsa.PublicKey)
+	// if !ok {
+	// 	fmt.Println("Error converting to mldsa.PublicKey")
+	// 	return
+	// }
+	// fmt.Println(mp.Equal(pr.PublicKey()))
 
 	pu := SubjectPublicKeyInfo{
 		Algorithm: pkix.AlgorithmIdentifier{
@@ -134,7 +134,7 @@ func main() {
 	// sign and verify
 	msg := []byte(*data)
 	s, err := pr.Sign(nil, msg, &mldsa.Options{
-		Context: "",
+		Context: *signContext,
 	})
 	if err != nil {
 		fmt.Printf("error signing %v", err)
@@ -153,10 +153,55 @@ func main() {
 		return
 	}
 	err = mldsa.Verify(pr2, msg, s, &mldsa.Options{
-		Context: "",
+		Context: *signContext,
 	})
 	if err != nil {
 		fmt.Printf("error verifying %v", err)
 		return
 	}
+	fmt.Println("Verified signature")
+
+	// *******************************************
+
+	////   create mu
+
+	mu := computeMu(pr.PublicKey(), msg, *signContext)
+
+	fmt.Printf("external calculated mu %s\n", hex.EncodeToString(mu))
+
+	sig, err := pr.Sign(nil, mu, crypto.MLDSAMu)
+	if err != nil {
+		fmt.Printf("error signing mu %v", err)
+		return
+	}
+	// The signature produced via external mu should verify against
+	// the original message via the standard Verify.
+	if err := mldsa.Verify(pr.PublicKey(), msg, sig, &mldsa.Options{
+		Context: *signContext,
+	}); err != nil {
+		fmt.Printf("error verifying mu %v", err)
+		return
+	}
+	fmt.Println("Verified with external mu")
+
+}
+
+// computeMu computes the μ message representative as specified in FIPS 204.
+// μ = SHAKE256(tr || 0x00 || len(ctx) || ctx || msg), where
+// tr = SHAKE256(publicKeyBytes) is 64 bytes.
+func computeMu(pk *mldsa.PublicKey, msg []byte, context string) []byte {
+	H := sha3.NewSHAKE256()
+	H.Write(pk.Bytes())
+	var tr [64]byte
+	H.Read(tr[:])
+
+	H.Reset()
+	H.Write(tr[:])
+	H.Write([]byte{0x00}) // ML-DSA domain separator
+	H.Write([]byte{byte(len(context))})
+	H.Write([]byte(context))
+	H.Write(msg)
+	mu := make([]byte, 64)
+	H.Read(mu)
+	return mu
 }
