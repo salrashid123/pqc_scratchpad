@@ -463,7 +463,9 @@ For an example in python, see `mlkem/python` folder`
 
 ### MLKEM TPM
 
-Finally,  you can use a TPM to generate the keyapir.  See the `mlkem/tpm` folder
+Finally,  you can use a TPM to generate the keyapir.  See the `mlkem/tpm` folder here
+
+* [https://github.com/salrashid123/pqc_scratchpad/tree/main/mlkem/tpm](https://github.com/salrashid123/pqc_scratchpad/tree/main/mlkem/tpm)
 
 the idea is that the `d`, `z` parameters are random values from a TPM and fed into the algorithm here:
 
