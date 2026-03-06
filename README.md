@@ -9,11 +9,17 @@ This repo is just a collection of `PQC` tools and sample code.
 ---
 
 * [MLDSA](#mldsa)
+  - [MLDSA with openssl](#mldsa-with-openssl)
+  - [MLDSA Standard go](#mldsa-standard-go)
+  - [MLDSA with CloudFlare CIRCL](#mldsa-with-cloudflare-circl)  
   - [JWT Signature](#jwt-signature)
   - [Google Cloud KMS PQC signature verification](#google-cloud-kms-pqc-signature-verification) 
+  - [AWS KMS PQC signature verification](#aws-kms-pqc-signature-verification)   
+  - [MLDSA x509 Certificate](#mldsa-x509-certificate)
 * [MLKEM](#mlkem)
   - [Using standard go library](#mlkem-standard-go)
-  - [Using circl library](#mlkem-circl)
+  - [Using circl library](#mlkem-circl-library)
+  - [Using GCP KMS](#mlkem-gcpkms)  
   - [JSON Web Encryption (JWE)](#mlkem-json-web-encryption)
   - [Source random from Trusted Platform Module](#mlkem-tpm)
   - [Parse openssl PEM keys](#mlkem-parse-pem-keys)
@@ -61,7 +67,7 @@ Digital Signatures using [ML-DSA](https://csrc.nist.gov/pubs/fips/204/final)
 * [Composite ML-DSA For use in X.509 Public Key Infrastructure and CMS](https://datatracker.ietf.org/doc/draft-ietf-lamps-pq-composite-sigs/)
 * [EVP_PKEY-ML-DSA](https://github.com/openssl/openssl/blob/master/doc/man7/EVP_PKEY-ML-DSA.pod)
 
-
+### MLDSA with openssl
 
 ```bash
 $ cat seed-only.pem 
@@ -136,12 +142,26 @@ $ openssl asn1parse -inform PEM -in bare-seed.pem
 openssl pkey  -in bare-seed.pem   -pubout -out public.pem
 ```
 
+### MLDSA standard go
+
+At the time of writing (3/6/26), mldsa is not supported in go but its pending on [https://github.com/golang/go/issues/77626](https://github.com/golang/go/issues/77626).
+
+However, you can either inject the candidate changes into your own go library or follow
+
+- [Generating and verifying MLDSA signatures using standard go](https://github.com/salrashid123/pqc_scratchpad/tree/main/mldsa/std_go)
+
+or use [https://pkg.go.dev/filippo.io/mldsa](https://pkg.go.dev/filippo.io/mldsa)
+
+### MLDSA with Cloudflare CIRCL
+
+If you want to use `github.com/cloudflare/circl/sign/mldsa/mldsa44` as the provider, see the [mldsa/circl](mldsa/circl/) folder
+
+
 ### JWT Signature
 
 * [golang-jwt for post quantum cryptography](https://github.com/salrashid123/golang-jwt-pqc)
 * [ML-DSA for JOSE and COSE](https://datatracker.ietf.org/doc/draft-ietf-cose-dilithium/)
 * [JWT Thumbprint calculation for ML-DSA-44](https://gist.github.com/salrashid123/fed96fd8adc36c5ab090d680071869bc)
-
 
 ### Google Cloud KMS PQC signature verification
 
@@ -204,11 +224,56 @@ This will
   * [issue#535:openssl parsing compatiblity issue for MLDSA](https://github.com/cloudflare/circl/issues/535)
 5. Verify the signature using the public key
 
-### x509 Certificate
+### AWS KMS PQC signature verification
 
-To issue x509 with openssl
+To use [AWS KMS MLDSA](https://docs.aws.amazon.com/kms/latest/developerguide/mldsa.html), first setup an MLDSA key and acquire the key-id and region.
 
-Using `openssl3.5.0` (if you don't have that version, use the dockerfile below)
+In my case, it was:
+
+```bash
+
+export AWS_ACCESS_KEY_ID=redacted
+export AWS_SECRET_ACCESS_KEY=redacted
+export AWS_REGION="us-east-2"
+
+$ aws kms describe-key --region=us-east-2 --key-id="37aca4ea-3915-441f-b03d-d90bad1eb45a" 
+{
+    "KeyMetadata": {
+        "AWSAccountId": "291738redacted",
+        "KeyId": "37aca4ea-3915-441f-b03d-d90bad1eb45a",
+        "Arn": "arn:aws:kms:us-east-2:291738redacted:key/37aca4ea-3915-441f-b03d-d90bad1eb45a",
+        "CreationDate": "2026-02-21T06:38:35.013000-05:00",
+        "Enabled": true,
+        "Description": "",
+        "KeyUsage": "SIGN_VERIFY",
+        "KeyState": "Enabled",
+        "Origin": "AWS_KMS",
+        "KeyManager": "CUSTOMER",
+        "CustomerMasterKeySpec": "ML_DSA_65",
+        "SigningAlgorithms": [
+            "ML_DSA_SHAKE_256"
+        ]
+    }
+}
+```
+
+you can get the public key using the awsCLI or running `example/ml-dsa-65-aws-kms/main.go`
+
+```bash
+aws kms get-public-key --region=us-east-2 --key-id="37aca4ea-3915-441f-b03d-d90bad1eb45a" --output text --query PublicKey > /tmp/PublicKey.b64
+openssl enc -d -base64 -A -in /tmp/PublicKey.b64 -out /tmp/PublicKey.der
+openssl pkey -inform DER -pubin -in /tmp/PublicKey.der -outform PEM -out certs/public.pem
+
+### then to run the sample:
+$ go run main.go --region=us-east-2 --keyID="37aca4ea-3915-441f-b03d-d90bad1eb45a"
+```
+
+### MLDSA x509 Certificate
+
+To issue x509 with openssl, see [x509 with mldsa](https://github.com/salrashid123/ca_scratchpad?tab=readme-ov-file#single-level-ca)
+
+To just generate an mldsa key and sign using  `openssl3.5.0`,
+
 
 ```bash
 ## using the 'bare-seed' PEM format for the private key
@@ -219,12 +284,6 @@ echo -n "bar" > /tmp/data.in.raw
 openssl dgst -sign private.pem -out /tmp/data.out.signed /tmp/data.in.raw 
 openssl dgst -verify public.pem -signature /tmp/data.out.signed  /tmp/data.in.raw  
 ```
-
-At the time of writing (2/22), golang doesn't support mldsa yet and its on the roadmap.
-
-```
-```
-
 
 ## MLKEM
 
@@ -275,7 +334,58 @@ $ go run default/main.go
 
 ### MLKEM CIRCL library
 
-For golang, you can also use `"github.com/cloudflare/circl/kem/mlkem/mlkem768"` package though i don't know how to convert the keys back into a compatible format
+For golang, you can also use `"github.com/cloudflare/circl/kem/mlkem/mlkem768"` package though i don't know how to convert the keys back into a compatible format.  See the [mlkem/circl](mlkem/circl/) folder
+
+### MLKEM GCP KMS
+
+Using [GCP KMS MLKEM](https://docs.cloud.google.com/kms/docs/key-encapsulation-mechanisms) 
+
+```bash
+gcloud kms keyrings create kem_kr --location=global
+
+gcloud kms keys create kem_key_1 \
+    --keyring kem_kr \
+    --location global \
+    --purpose "key-encapsulation" \
+    --default-algorithm ml-kem-768 \
+    --protection-level "software"
+
+
+gcloud kms keys versions get-public-key 1 \
+    --key kem_key_1 \
+    --keyring kem_kr \
+    --location global  \
+    --output-file /tmp/kem_pub.nist \
+    --public-key-format nist-pqc
+```
+
+The extract the public key into PEM format:
+
+```bash
+$ openssl --version
+  OpenSSL 3.5.0-dev  (Library: OpenSSL 3.5.0-dev )
+
+### for ML-KEM-768
+$ { echo -n "MIIEsjALBglghkgBZQMEBAIDggShAA==" | base64 -d ; cat /tmp/kem_pub.nist; } | openssl asn1parse -inform DER -in -
+    0:d=0  hl=4 l=1202 cons: SEQUENCE          
+    4:d=1  hl=2 l=  11 cons: SEQUENCE          
+    6:d=2  hl=2 l=   9 prim: OBJECT            :ML-KEM-768
+   17:d=1  hl=4 l=1185 prim: BIT STRING        
+
+$ cd example/
+$ { echo -n "MIIEsjALBglghkgBZQMEBAIDggShAA==" | base64 -d ; cat /tmp/kem_pub.nist; } \
+   | openssl pkey -inform DER -pubin -pubout -out certs/public.pem
+```
+
+for an end to end example
+
+```bash
+cd mlkem/gcp_kms
+$ go run main.go --kmsURI="projects/core-eso/locations/global/keyRings/kem_kr/cryptoKeys/kem_key_1/cryptoKeyVersions/1"
+DerivedKey: b1aa84025e627eb6cab630314888b48d2a0ac216ea2bd6c2b9e08f41cbe2d577
+DerivedKey: b1aa84025e627eb6cab630314888b48d2a0ac216ea2bd6c2b9e08f41cbe2d577
+
+```
 
 ### MLKEM JSON Web Encryption
 
@@ -283,11 +393,61 @@ see
 
 * [Json Web Encryption (JWE) using Post Quantum Cryptography (ML-KEM)](https://github.com/salrashid123/jwe-pqc)
 
-### MLKEM CIRCL library
-
 ### MLKEM x509
 
 at the time of writing 3/15/26, You can issue an mlkem x509 by **Overriding** standard go's crypto/x509 library (note this isn't recommended becasue its an override)...but just to see it, look at the `mlkem/issue_cert` folder
+
+with openssl where the root is mldsa and the cert is mlkem you can issue an x509 without a CSR by using [-force_pubkey](https://docs.openssl.org/3.2/man1/openssl-x509/#certificate-output-options).  
+
+Instead of forcing, presumably, you establish trust in the public key you want to embed by any other attestation 
+
+```bash
+git clone https://github.com/salrashid123/ca_scratchpad.git
+cd ca_scratchpad/
+mkdir -p ca/root-ca/private ca/root-ca/db crl certs
+hmod 700 ca/root-ca/private
+cp /dev/null ca/root-ca/db/root-ca.db
+cp /dev/null ca/root-ca/db/root-ca.db.attr
+echo 01 > ca/root-ca/db/root-ca.crt.srl
+echo 01 > ca/root-ca/db/root-ca.crl.srl
+
+## MLDSA Root CA
+export SAN=single-root-ca
+openssl genpkey -algorithm ML-DSA-44 -out ca/root-ca/private/root-ca.key
+openssl req -new  -config single-root-ca.conf  -key ca/root-ca/private/root-ca.key    -out ca/root-ca.csr  
+openssl ca -selfsign     -config single-root-ca.conf     -in ca/root-ca.csr     -out ca/root-ca.crt     -extensions root_ca_ext
+
+## MLKEM key
+export NAME=server
+export SAN="DNS:server.domain.com"
+openssl genpkey -algorithm mlkem768 -provparam ml-kem.output_formats=bare-seed   -out certs/$NAME.key
+openssl pkey  -in certs/$NAME.key  -pubout -out certs/$NAME.pem
+
+openssl x509 -new -CAkey ca/root-ca/private/root-ca.key  -CA ca/root-ca.crt \
+  -force_pubkey certs/$NAME.pem -subj "/CN=my svc account Certificate"  -out certs/$NAME.crt
+```
+
+then you would see
+
+```bash
+$ openssl x509 -in certs/$NAME.crt -noout -text
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            3a:82:fa:e7:02:6b:3a:53:30:42:b8:34:96:96:80:75:f5:8b:50:99
+        Signature Algorithm: ML-DSA-44                            <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        Issuer: C=US, O=Google, OU=Enterprise, CN=Single Root CA
+        Validity
+            Not Before: Mar  6 12:00:24 2026 GMT
+            Not After : Apr  5 12:00:24 2026 GMT
+        Subject: CN=my svc account Certificate
+        Subject Public Key Info:
+            Public Key Algorithm: ML-KEM-768  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                ML-KEM-768 Public-Key:
+                ek:
+                    87:91:68:f5:ca:c5:e1:f9:88:b7:c6:9b
+```
 
 ### MLKEM cms rfc9629
 

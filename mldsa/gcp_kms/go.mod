@@ -1,10 +1,10 @@
 module main
 
-go 1.24.0
+go 1.25.0
 
 require (
 	cloud.google.com/go/kms v1.21.1
-	github.com/cloudflare/circl v1.6.1
+	filippo.io/mldsa v0.0.0-20260215214346-43d0283efc3e
 )
 
 require (
