@@ -64,6 +64,48 @@ var ()
 func main() {
 	flag.Parse()
 
+	// the following generat3es a keypair and saves it as 'bare-seed format')
+
+	// pk, sk, err := mldsa44.GenerateKey(rand.Reader)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// pubPEM, err := pki.MarshalPEMPublicKey(pk)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// fmt.Printf("Public PEM \n%s\n", pubPEM)
+	// privPEM, err := pki.MarshalPEMPrivateKey(sk)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// fmt.Printf("privPEM PEM \n%s\n", privPEM)
+
+	// // to save as `bare-seed`, extract the seed and save as private key
+
+	// s := PrivateKeyInfo{
+	// 	Version: 0,
+	// 	PrivateKeyAlgorithm: pkix.AlgorithmIdentifier{
+	// 		Algorithm: mldsa44aoid,
+	// 	},
+	// 	PrivateKey: sk.Seed(),
+	// }
+
+	// sb, err := asn1.Marshal(s)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// // 2. Create PEM block
+	// block := &pem.Block{
+	// 	Type:  "PRIVATE KEY",
+	// 	Bytes: sb,
+	// }
+	// err = pem.Encode(os.Stdout, block)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
 	/// ********************************* READ
 
 	var pubs *mldsa44.PublicKey

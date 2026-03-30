@@ -69,52 +69,10 @@ Digital Signatures using [ML-DSA](https://csrc.nist.gov/pubs/fips/204/final)
 
 ### MLDSA with openssl
 
-```bash
-$ cat seed-only.pem 
------BEGIN ML-DSA-65 PRIVATE KEY-----
-MDQCAQAwCwYJYIZIAWUDBAMSBCKAIEfKuXz2ilU1mRtl5QAgvCAaFH0Crzw+VeX/
-BJXSXodV
------END ML-DSA-65 PRIVATE KEY-----
-
-
-### note the 8020 prefix in the HEX DUMP below
-$ openssl asn1parse -inform PEM -in certs/seed-only.pem 
-    0:d=0  hl=2 l=  52 cons: SEQUENCE          
-    2:d=1  hl=2 l=   1 prim: INTEGER           :00
-    5:d=1  hl=2 l=  11 cons: SEQUENCE          
-    7:d=2  hl=2 l=   9 prim: OBJECT            :ML-DSA-65
-   18:d=1  hl=2 l=  34 prim: OCTET STRING      [HEX DUMP]:802047CAB97CF68A5535991B65E50020BC201A147D02AF3C3E55E5FF0495D25E8755
-```
-
-to convert to `bare-seed`, first remove the PEM Header to only have `PRIVATE KEY`
+The following uses openssl to generate the PEM MLDSA key as `bare-seed`
 
 ```bash
-$ cat seed-only.pem 
------BEGIN PRIVATE KEY-----
-MDQCAQAwCwYJYIZIAWUDBAMSBCKAIEfKuXz2ilU1mRtl5QAgvCAaFH0Crzw+VeX/
-BJXSXodV
------END PRIVATE KEY-----
-
-$ openssl pkey -in seed-only.pem -text
-
-    ML-DSA-65 Private-Key:
-    seed:
-        47:ca:b9:7c:f6:8a:55:35:99:1b:65:e5:00:20:bc:
-        20:1a:14:7d:02:af:3c:3e:55:e5:ff:04:95:d2:5e:
-        87:55
-
-### as asn1:
-$ openssl asn1parse -inform PEM -in seed-only.pem
-    0:d=0  hl=2 l=  52 cons: SEQUENCE          
-    2:d=1  hl=2 l=   1 prim: INTEGER           :00
-    5:d=1  hl=2 l=  11 cons: SEQUENCE          
-    7:d=2  hl=2 l=   9 prim: OBJECT            :ML-DSA-65
-   18:d=1  hl=2 l=  34 prim: OCTET STRING      [HEX DUMP]:802047CAB97CF68A5535991B65E50020BC201A147D02AF3C3E55E5FF0495D25E8755
-```
-
-Now convert to `bare-seed`
-
-```bash
+# docker run -v /dev/urandom:/dev/urandom -v `pwd`/certs:/apps/certs  -ti salrashid123/openssl-pqs:3.5.0-dev
 $ openssl pkey -in seed-only.pem  -provparam ml-dsa.output_formats=bare-seed   -out bare-seed.pem
 
 $ cat bare-seed.pem 
@@ -156,6 +114,28 @@ or use [https://pkg.go.dev/filippo.io/mldsa](https://pkg.go.dev/filippo.io/mldsa
 
 If you want to use `github.com/cloudflare/circl/sign/mldsa/mldsa44` as the provider, see the [mldsa/circl](mldsa/circl/) folder
 
+Note that `circl` library marshals private and public keys as a binary.  If you want to use this library to save as `bare-seed` format, you need to marshal it as standard a PEM format.
+
+
+by defaut this library will save as `seed-only` and prefix a header with `ML-DSA-44` as PEM
+
+```bash
+-----BEGIN ML-DSA-65 PRIVATE KEY-----
+MDQCAQAwCwYJYIZIAWUDBAMSBCKAIFJzUWfjlrlWwutVniJIvGkIMC1FCI4ZX2RV
+Ao4BN3J3
+-----END ML-DSA-65 PRIVATE KEY-----
+```
+
+if you want to convert the PEM to standard `bare-seed`, see the `mldsa/circl/main.go` snippet or the opensl commands below in `Openssl ML-DSA Format` section
+
+If you are using openssl to convert to bare-seed, remember to remove the `ML-DSA-65` preamble
+
+```bash
+-----BEGIN PRIVATE KEY-----
+MDQCAQAwCwYJYIZIAWUDBAMSBCKAIFJzUWfjlrlWwutVniJIvGkIMC1FCI4ZX2RV
+Ao4BN3J3
+-----END PRIVATE KEY-----
+```
 
 ### JWT Signature
 
