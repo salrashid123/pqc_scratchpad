@@ -36,6 +36,7 @@ This repo is just a collection of `PQC` tools and sample code.
   - [crypto/mldsa package](#crypto-mldsa)
 * [TLS](#tls)
   - [curl](#curl)
+  - [envoy](#envoy)  
 * [PKI](#pki)
     - [ML-DSA](#ml-dsa)
     - [ML-KEM](#ml-kem)
@@ -841,6 +842,25 @@ docker run -ti openquantumsafe/curl curl -vk   https://kms.us-west-1.amazonaws.c
 
   ## * SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384 / p384_kyber768 / RSASSA-PSS
 ```
+
+### envoy
+
+If you want to enforce MLKEM key exchange using envoy inbound and outboud, see `mlkem/envoy/` folder and run as
+
+see [issue/33941](https://github.com/envoyproxy/envoy/issues/33941)
+
+```bash
+docker cp `docker create envoyproxy/envoy-dev:latest`:/usr/local/bin/envoy .
+
+./envoy -c envoy_1.yaml -l trace
+
+## then use openssl to display the key exchange
+openssl s_client -connect localhost:8081 --servername http.domain.com  -tls1_3 -curves X25519MLKEM768   --trace
+
+GET /get HTTP/1.1
+Host: localhost:8081
+```
+
 
 ## PKI
 
