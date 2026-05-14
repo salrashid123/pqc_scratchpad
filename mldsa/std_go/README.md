@@ -10,9 +10,9 @@ Eventually, i'll remove all this when its merged upstream
 To setup
  
 ```bash
-git clone --branch go1.26.0 --single-branch --depth 1 https://github.com/golang/go.git goroot
-cd goroot
-git apply ../version.diff
+git clone  --depth 1 https://go.googlesource.com/go   goroot
+cd goroot/
+git fetch https://go.googlesource.com/go refs/changes/06/776706/5 && git checkout -b change-776706 FETCH_HEAD
 
 cd src/
 ./make.bash
@@ -21,9 +21,6 @@ cd ../../
 
 export GOROOT=`pwd`/goroot
 export PATH=$GOROOT/bin:$PATH:
-
-$ go version
-go version go1.26.0-test linux/amd64
 ```
 
 Then to sign/verify, run
