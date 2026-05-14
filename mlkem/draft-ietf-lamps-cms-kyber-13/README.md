@@ -120,26 +120,21 @@ CMS_ContentInfo:
 
 ```
 
-
+To setup
+ 
 ```bash
-### go to the `issue_cert` filder and apply the diff to the custom go release
-# cd ../issue_cert
-# git clone --branch go1.25.1 --single-branch --depth 1 https://github.com/golang/go.git goroot
+git clone  --depth 1 https://go.googlesource.com/go   goroot
+cd goroot/
+git fetch https://go.googlesource.com/go refs/changes/06/776706/5 && git checkout -b change-776706 FETCH_HEAD
 
-# cd goroot
-# git apply ../x509.diff
-# git apply ../version.diff
+cd src/
+./make.bash
 
-# cd src/
-# ./make.bash
+cd ../../
 
-# cd ../../
-# export GOROOT=`pwd`/goroot
-# export PATH=$GOROOT/bin:$PATH
+export GOROOT=`pwd`/goroot
+export PATH=$GOROOT/bin:$PATH:
 
-## notice you'll see the modified version of go
-
-# $ goroot/bin/go version go1.25.1-mod linux/amd64
 
 
 $ go run main.go 

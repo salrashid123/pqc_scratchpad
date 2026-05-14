@@ -23,18 +23,21 @@ the `issued.pem` (which will be different for you) is actually an RSA signed cer
 
 
 ```bash
-git clone --branch go1.25.1 --single-branch --depth 1 https://github.com/golang/go.git goroot
-
-cd goroot
-git apply ../x509.diff
-git apply ../version.diff
+To setup
+ 
+```bash
+git clone  --depth 1 https://go.googlesource.com/go   goroot
+cd goroot/
+git fetch https://go.googlesource.com/go refs/changes/06/776706/5 && git checkout -b change-776706 FETCH_HEAD
 
 cd src/
 ./make.bash
 
 cd ../../
+
 export GOROOT=`pwd`/goroot
-#export PATH=$PATH:$GOROOT/bin
+export PATH=$GOROOT/bin:$PATH:
+
 
 $ goroot/bin/go version go1.25.1-mod linux/amd64
 
