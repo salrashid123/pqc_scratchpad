@@ -14,7 +14,8 @@ This repo is just a collection of `PQC` tools and sample code.
   - [MLDSA with CloudFlare CIRCL](#mldsa-with-cloudflare-circl)  
   - [JWT Signature](#jwt-signature)
   - [Google Cloud KMS PQC signature verification](#google-cloud-kms-pqc-signature-verification) 
-  - [AWS KMS PQC signature verification](#aws-kms-pqc-signature-verification)   
+  - [AWS KMS PQC signature verification](#aws-kms-pqc-signature-verification)
+  - [HashiCorp Vault Enterprise](#hashicorp-vault-enterprise)   
   - [MLDSA x509 Certificate](#mldsa-x509-certificate)
 * [MLKEM](#mlkem)
   - [Using standard go library](#mlkem-standard-go)
@@ -248,6 +249,86 @@ openssl pkey -inform DER -pubin -in /tmp/PublicKey.der -outform PEM -out certs/p
 ### then to run the sample:
 $ go run main.go --region=us-east-2 --keyID="37aca4ea-3915-441f-b03d-d90bad1eb45a"
 ```
+
+### HashiCorp Vault Enterprise
+
+HashiCorp Vault also support MLDSA but you have to use the "Enterprise" version.
+
+The following demonstrates using the _trial_ Vault Enterprise 
+
+
+```bash
+### first get the root token and vault's address
+export VAULT_TOKEN=hvs.CAESIKIBgCMQ_l3sJXdHEwwb6KfR9Q14buCX7bIqwA8YSE4YGicKImh2cy4xUGlHVVhBc2RzQ---redacted
+export VAULT_ADDR="https://vault-cluster-public-vault-c305537c.8639af5b.z1.hashicorp.cloud:8200"
+export VAULT_NAMESPACE="admin"
+
+## enable the transit engine and create an mldsa-65 key
+
+cd example/
+vault secrets enable transit
+vault policy write secrets-policy secrets_policy.hcl
+vault policy write token-policy token_policy.hcl
+vault write -f transit/keys/my-sign-key type=ml-dsa parameter_set=65
+
+
+$ vault write -f transit/keys/my-sign-key type=ml-dsa parameter_set=65
+      Key                       Value
+      ---                       -----
+      allow_plaintext_backup    false
+      auto_rotate_period        0s
+      deletion_allowed          false
+      derived                   false
+      exportable                false
+      imported_key              false
+      keys                      map[1:map[certificate_chain: creation_time:2026-05-26T14:37:45.456447107Z hybrid_public_key: name:ml-dsa-65 public_key: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]]
+      latest_version            1
+      min_available_version     0
+      min_decryption_version    1
+      min_encryption_version    0
+      name                      my-sign-key
+      parameter_set             65
+      supports_decryption       false
+      supports_derivation       false
+      supports_encryption       false
+      supports_signing          true
+      type                      ml-dsa
+
+
+#### now create a "end user" token (i.,e not root)
+$ vault token create -policy=token-policy  -policy=secrets-policy
+
+export VAULT_TOKEN=hvs.CAESIC5M9tE29uEq5_ms9-FgbevRmBzxkryS9PURZk0fgmk4GicKImh2cy5obU9LVXF2a052Q3N3R2lGQW5DR---redacted
+export VAULT_ADDR="https://vault-cluster-public-vault-c305537c.8639af5b.z1.hashicorp.cloud:8200"
+export VAULT_NAMESPACE="admin"
+
+### test signing
+PAYLOAD=$(echo -n "Hello, Vault" | base64)
+vault write -format=json transit/sign/my-sign-key input="$PAYLOAD"
+
+```
+
+Now use it
+
+```bash
+$ go run main.go
+```
+
+note that you can't extract the public key at this point so what i ended up doing is generating the public key by 'reading' the vault structure using the following command 
+`vault read transit/keys/my-sign-key` and marshalling it into PEM format
+
+```bash
+$ vault read transit/export/public-key/my-sign-key
+        Error reading transit/export/public-key/my-sign-key: Error making API request.
+
+        Namespace: admin/
+        URL: GET https://vault-cluster-public-vault-c305537c.8639af5b.z1.hashicorp.cloud:8200/v1/transit/export/public-key/my-sign-key
+        Code: 500. Errors:
+
+        * 1 error occurred:
+            * unknown key type ml-dsa for export type public-key
+```
+
 
 ### MLDSA x509 Certificate
 
