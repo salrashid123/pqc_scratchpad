@@ -1,0 +1,205 @@
+### Using TPM based MLKEM and MLDSA 
+
+Samples which uses a patch for [go-tpm](https://github.com/google/go-tpm) for MLDSA and MLKEM based operatons
+
+`MLDSA/MLKEM` support for TPM is defined in `rev.185`
+
+* [tpm-library-specifications](https://trustedcomputinggroup.org/resource/tpm-library-specification/)
+
+However, go-tpm does not yet support those mechanisms nor is it supported in `tpm2_tools`.
+
+This sample uses `wolfTPM` as a software TPM (its the only one i found which has PQC support so far) and applies a patch to test these out
+
+>>> NOTE: this is an unsupported patch...
+
+
+References:
+
+* [wolfTPM MLDSA/MLKEM](https://www.wolfssl.com/wolftpm-post-quantum-cryptography-release-ml-dsa-and-ml-kem-support-via-tcg-tpm-2-0-library-specification-v1-85/)
+* [TPM2 Commands rev.185](https://trustedcomputinggroup.org/wp-content/uploads/Trusted-Platform-Module-2.0-Library-Part-3-Commands_Version-185_pub.pdf)
+* [TPM Structures rev.185](https://trustedcomputinggroup.org/wp-content/uploads/Trusted-Platform-Module-2.0-Library-Part-2-Structures_Version-185_pub.pdf)
+
+---
+
+First get go-tpm and apply the patch 
+
+```bash
+git clone https://github.com/google/go-tpm
+cd go-tpm
+git checkout 9f0977c7f65a2d778e895ebeb35440b2a707eaf
+git apply ../pqctpm.diff
+```
+
+### Setup
+
+Install `wolfTPM` with mldsa/mlkem support
+
+```bash
+git clone https://github.com/wolfSSL/wolfssl.git
+cd wolfssl
+./autogen.sh
+./configure   --enable-wolftpm --enable-mldsa --enable-mlkem  --enable-harden --enable-keygen --prefix=`pwd`/wolfssl
+make
+make install
+
+git clone https://github.com/wolfSSL/wolfTPM.git
+cd wolfTPM
+./autogen.sh
+./configure  --enable-fwtpm --enable-swtpm --enable-pqc --with-wolfcrypt=`pwd`/wolfssl --prefix=`pwd`/wolftpm
+make
+make install
+
+cd wolftpm/bin
+./fwtpm_server --clear
+```
+
+Test connectivity to wolftpm
+
+```bash
+# export TPM2TOOLS_TCTI="mssim:host=localhost,port=2321"
+export TPM2TOOLS_TCTI="swtpm:port=2321"
+
+tpm2_startup -c
+tpm2_getrandom --hex 8
+tpm2_flushcontext -t && tpm2_flushcontext -s && tpm2_flushcontext -l
+```
+
+---
+
+### MLKEM
+
+Creates a TPM based MLKEM key.  Encapsulation/Decapsulation is done using
+
+1. Encapsulate using `"crypto/mlkem"`
+2. Encapsulate using TPM
+3. Decapsulate using TPm
+
+```bash
+$ go run mlkem/main.go 
+2026/06/15 08:54:52 ======= Init  ========
+2026/06/15 08:54:52 TPM Max buffer 8192
+2026/06/15 08:54:52 ======= createPrimary ========
+KEM Type: 2
+-----BEGIN PUBLIC KEY-----
+MIIEsjALBglghkgBZQMEBAIDggShAPBLc+r2iRkBK5cSEDUyCmHshtZsLcEIjMPc
+X9C1BrJctRpMmZTlOpuHJx+wvZr8zTwURascuHnHAtlHGYRytSYBrUmgHDGlDX/8
+sXGCyaNEXWiTKnMnv3pkwcP6laRXKRKJcufGQGdXyAYBqHmIJb0LWgdklX4ZRhTD
+JswGq8diYxg6po4REMxREITmzrzYXtPYFWKQxWrkr44KbFtYY7jaJs14ivKXgrTp
+xzUMM8kgZN5mau/CKVuChpoCaoPRCtZzqpoTWI9Yv/ayhgTFmJxay/4QKzQYdg2M
+YY8SQgbVw66aKuqackJ3RvVkHH8wkCAarioHnQ74bF7JiphRBAiKIoK1K1HwoHdo
+Jbpqbj8ZAi+hwxK4wkrSyG/0DPA0ETZTHAaAGlOsKF4ayJtxlQ7Ssz7bk9fBpfgF
+HMKyaQunldEqrIOHdZoSUTegR9rYDgh0f6X4FpEHQIJMvmAatAUDGlJYeHccTOqJ
+DayGWOD7Pu7EDHz1eTj8betQdD2GW9R4wrGCg0sgCYvJHXlcp5gsoQr1NrAmqLtM
+kV2wX9ZpGXHRgkd1KF9owtP1iAeplsJHortkW204u4tnfITBcwWxpqtMiI7qdXXX
+VRxgHBfKJqfYsx/0XpkMHIbHuvDCrDm5ucPRoz1TRPontlikQ98pvJA3uzRczD75
+CGsZLe+LvPJWsDYHX9ahS4/BxPwHqJ6XD+DTL7scnMgjmEwRUFyqoG4oNmLbMQka
+WX2sEetMenz2UsH1Es2risSxSsaYgoahEHNxD3pMVqpSe3CcBEFKMwy7otf2sh+g
+cb3qUYSSyoaoIVkkzYWhK0RpGdzHiMjTPC77UfwDtrlVrZTcgagTXFvJGsS5FWnb
+NFWKbnwrncKbJdvJRoJBwqJ3sRH1JecQRxCBEV44YVr6n1JmcG2jMpOsBHhKfRcw
+FnN8q1I0YoVGiMzUVYTsoFXQZSyRZl9bxQWooHB5XwH7Z2MHF9Y1PfASNZBKxrHi
+mD20T9NgmrxFvVllpjAkOI3ow6V4ntortSK8qIB8je0kVkcTa4llTgAiy8rKlDmB
+MI+VyXDsDBhJoFkoe8GQMu8ZiucZaoPogQNVsY3HrQdFbLOhJBj5HcTgF9q0ZbJX
+MljGycimUyHXhA2JSJDgb/mhT5ZhvZo3W8B3FWbKRLfDB0HUzc3FcMIni3rSXt3U
+dWbrl3XLgzJaM9HYRw4cYMBbJ8dzcPobpI3LHWhAssqyemVmfdz0DK/oFF4ovCJk
+nTXniVSMCO7HkVjkqOYbWDxkpJy2kLiiqcdkzysLd0rDGJ9Qgv6glDKxtAA8Mt05
+MNVIw+KpmFWQUFAxA8UVERoVTQb7olLJcOI6xhSGpxv4XkkUuiEpRsDsP1tkbhhq
+bbDxeKmKyztrl1epqDjJQkRxHhZ3x5BHmvKMimYMvxnTo1QDKKrGkS8SXKZlHqYL
+LntBLLWqWeggGnKkrSRzWhFsUZWDAIhwH/yoRGPRSipjyLmYZMOHE2ebbPG8xrYr
+wM3sxGMlwSzDNcUSbR2zgawCB64gHNNoGUrTRIb1ypiTAJ9L+cFOOC56hRLYIFcF
+Eb2PIX17
+-----END PUBLIC KEY-----
+
+
+Encapsulate
+CipherText pKNirsAIrRq2YVIGby5nCBeSGCLeBJLPrWwKha8DOH1B4q91zcWV4Tq3FufXXDre4aftleFMSoz95eT82svIUlrHmwJxIICeexCPTturzvdKIQx3ohIVJwHTNYsSuRVCfeWtn1Axrjx9dZJmvPoRutiDFQ/J0AozLfc+9MVQHOr/v06TSal+9MLPJJgzkxur/aPTzwN+Sd8z9/K0ibDOGc86FKdA6d0VXEeWRC0SRGOrKK0KHgNpwAz/XtfqJiD5vQkjk8KQLQUXhcJQsXAQA7vB5FdA1urGFoLQtnLbPlYPDQG0tbtUmxB+yy9YGrRkWc51tstdIV1Qn49n/Cfx1GOA2DgHE0MCb4TLRA0d6of7zuxAxSlsY4HUUOJIFGoJfAKx1eZAQFej9gfwqbCcQSBwleT2yvPi5sd6HIAg0G1Az6sIgkBuzNT5EyAr9niyqwfZyD/JsJNwy/do1qYXnAXg8CBGzE28JmnlkI04lm+xtytffFtcKMToy1ors3CsCbVyN8FoiwJ4ycmx5uRdaxOvIOp/I9meYcxaluQA1q+a0U0VGt51V2fdbWzAVCmbfrFdxq3SLvKdpzV7hvY/gT/Pae1l+KwvHif9Z8D3yuOeoey91IXXVhljwofNiBOJvfWjvbtS9UVAHzzSLYSqQSgImYBxzDC/eg6wUafjySDIhOyiwe0g/8jih0mqW48i54t6XSoTB2rSEvGtmbJxU1yMWpbIlAhmWsto6Bleez/XfjYTGAIUY0L9R/xUSTSY07JzSPM6b4Fh2LN7nxgMjIMNB/WN2PCiw5t9fpq0ANB/RYyvXqYa74We4qDK7n6yhnZf4KTQIouKuKFBPj/F5JT+ToJV1wUE81bqQ0qqbHbFum9PQG5B6OrBRk2f2WzTqRqsvaNWBbsn7R0paI4LFSBrygyhFXCdJ6YCK+ix9YnK153X2klv58alNZI59W+MXw9lSOAIn9dGcZukZWfg7cIVy6ICrdrTBtYw8g6SPbddckZ2e2aOkHsjhvpzC7V8UwD7/+OkAVi2oaT39E25jkoavI9fJkcMKshpAw9Qz6WyTLbQzfULD2BjwsqhzlU3s+TGS2i3cSfR3K3sG7saHdyIMjscjeOniSwxuQmB+qiMDxxtOM+Zd+LHEBztlEflr3s6sa7dl+mjk5My5/zpVLCRwuHMuJn2iQvVzeA7HfhpIe/tbs62gi2l567qt3M74r0LPEYUU0yVfO4DjNXqieEgLVWYJoMmxIUulL6bLMXTZKistO6pO999Axd6Jmki20Un8BVfYVf0jqTCwzSwnnjQU4OYlkokLVctKMemLogJzaLqHr5Xo5QqJ+hDedrVqwT5n9/FucvApeBYtUCvh4MTZZmnDF8gsr2OkhTSt4BsyHEv261mtQoS+dLSEJ7Hoo9Ypw1xuWz2v1+/+Vz/8gTlVMy/+Ua9q0A+QC6H7WA=
+
+SharedSecret og3qWqR9RRldaq3U53wcQIQEdkBCPhOIMUOP0z1ZpY8=
+
+Decapsulate
+SharedSecret from decapsulation og3qWqR9RRldaq3U53wcQIQEdkBCPhOIMUOP0z1ZpY8=
+```
+
+
+### MLDSA
+
+
+The verification is done in two ways:
+
+1. Sign with TPM
+2. Verify with standard go (currently `"filippo.io/mldsa"` and later `crypto/mldsa`)
+3. Verify with TPM
+
+Note, the mldsa signature here does not use external mu.
+
+```bash
+go run mldsa/main.go 
+
+2026/06/15 09:14:44 ======= Init  ========
+2026/06/15 09:14:44 TPM Max buffer 8192
+2026/06/15 09:14:44 ======= createPrimary ========
+MLDSA Type: 2
+MLDSA Public Key: 
+-----BEGIN PUBLIC KEY-----
+MIIHsjALBglghkgBZQMEAxIDggehAMFHkU9UZ1m2XNTxnLHp+lT59JqeXCqJ0Z3m
+jlNbsrZK2NWEPn4+frS27D8neThcvdgzT8mZ7DqPODIUqo0qtPzrCvsyDef/RaAT
+2N5OsaBP6GpRFggw9je+7vS9g80l1uscFFr8Wnu9gFhYAPkGRHVMS7RMaNLL/i/G
+bW+OU4jg1b2bjc0E3eiMchnKnqb0s9VpVdOePPYlYLQQW/NkpLH1wgRpeGMOM+5u
+ijFqTQjx4QDFC6rxY+O5J3+ONAg5lKlMwEQALjq3hc8X9cNh3a/CLInlB+5G5Lvj
+bzjn8BuOAE0Ony8iZebxbZ4lz7B86BgLelhfD8qFJebnmpmzmrDkgaSdDwF3NmAl
+wUgn6OUxYfVUtg/v1Lyf6LspWXr9j5rgdplQJzunR11/q56VpWiIkQEQyuAgouvi
+yMxYZsJfYjp/loUU6hXjdnFxqun5VzSxliGWoBXPhqgtve3rTJcXWchQNX23ZB8Z
+N8XfnjzrujGrNN48Xz1pq6tLmshDadlhWrYw0L6FsNaRz/6xMUiVMOg/2SgICGND
+a/g59s/xGQFt1sX4leritzdpbLYvk7xYDs2mlpBINzCtDHZ6xrnsB3043GqUIyd8
+YrC903Ec07eFx3V6nsD838nrjE+3qNW6/W4Z0kMZp7TMTO0xZlhXocO7ewINgX/b
+61bE2cvPXQOIC8q3KyHlMql/EiAZBEwSDZBRdPwxvCkSHFfAgXmEB3z4FjQBC3JS
+FlSrN5gd5OGwJqGkVEIDfs5p1Z6U8mYYEbIkgWsEwBkeIFO3hw0xHX/sO3Dfdl/G
+FvxXmreVNYcEm4ABFVFd8DnVbRICo/H9gV19bqKvAj6lHoT3EK+0qpg4G5NyNRyP
+CMGZeRObp5p+86o10Ar2y3Q+m3+RePUDs9XaoCtYAYYyyTdlohpoWWoM5uEnD/Io
+JNPc7WTWLGOggkGViZtRktMXg7wkyxmkpwakgM7sxNP0rHsa55I2MRC+6JlCnIKq
+TDBSWiUQXsj0pS7Gj+FCfN3CKuPgWzk524TGtNmFt17o0LScwUeJbkP6Yxxj3SQj
+/R4VMzbVC1+/T4o6w/o5+wCLGWXCQZPAb6XecB4J5zBE9YWRIwyfCht25UOltWkw
+hXlQaYjOdlvjXifoEl6DICv31QmOl8Z6od+btytChPaaVM9hg7azuVa6gBjQsgko
+Q/3Qktyjikul1+M3wRNnUV/yvRrjrjFC5EdqVmABxecwrGhpoLqbTYPji1/Lx6iZ
+wsa2mEWQ9YvQze5LejwW3NrHU6Pcp42q+qD6oPYsT4N4K3sOaHc3SK5aZeEAww3k
+C6l7p+temwu9sKz6yCxiuDytoNVfcoB3yFqay4YAXeTRQJmbWUrih0QRGLLdBmBe
+8/Z/UvFUCMNzt9n23XaUIwjLkpqIgZx3xiws07xg92xmRa0FWDr1E0f9VUU5nIYN
+zmOwicnilOYpuWs27FlCg4+XsRaG5Ka641ab/pA8cfKSiv7rDLj8vW8dwNiecTMv
+0GlIkPv6/lG2oH40Os38pZPa5nSyT93vjh284I2kjlEnILvkRyo0oJTwzGDSqety
+gctkFR0MPQyoMi4qbBm7fGdROppuPS1AaPcD7hTWlz8dvkBDeExhk0XN0ny8O3yL
+bici3W05CQgiN23ZjhpNAhnqX0r9Z3oBpByNg4i0HRXHnqfzarXjBqDShSC0SNm9
+FXdQUwGizocBjMaKtYYbhJsQLgL4/6vv6CHTHMQYRDNhtltRvRK8/R5sp7+NwnaO
+/2wyLA1VE+W/xcAj0SdLIbQE/kZmAh/UFVLpJKqSUsC78E3P7TJJ2LZ3HzVJ/NJh
+fnoWnxv8YJljDaC0O/AUlP1DPkoCVeJbXCAa7DvZHfxHsAYXQ1U8Q7c8VwJ/TBum
+D7MVZFS3cjGTQvR8HXXyWfINgqKJIgG8UvMvG0QquYjgnAlnZdFKKpDTkiptm/kL
+3YBl88UNKd0amFbjjCocGbzw2nWV9C0BMiiYsnSjR/vQ51JZm0T5BSj0zxrTgteC
+qjd5xWQgwOwasyulSKBU5UvYsa3jUBmG+HCiqa/yaEBRbFMBLhsu/+9ZieAGL1op
+5N4Ht5ZKv27b8yPprlv1yVZyumKpTWMwZOCM1V8nK0q42XzqvqXvsCPEAM8ZYjkF
+Jil3J6kXq9tFJ2h78yMnDBkA8r37xCic/UWLQfgggpQ94Wzul9Gzl7jbGLobLelK
+pLWtf3I0Y7jTCDHKwWD5/bCQo9GHj/tvT4PW0MlgnJctoWGMj1fvU3KmhCVa95Oj
+FpUWvQ/AjoIKGFnH73fVHWOSpaPbfUFRA+TV+7EbgPrfOj5AX22capI6MF3mO4qX
+Uf58TJ4LBe3kdKw2XKpKrMdz5pn41UYZ/WEC95/i69LH5uDMVsB9soyKoCfzr0rc
+GIdFuKbhrN/3Jrw1q4gVoDRI4IZTuw3lS07OpTpCpOopXMwtMvd/N6UsCfbPoFUU
+8Zo2swZV33mr1v6BqN/lsYv4y0CytJnYdyq/kDMwlLYwz/OKSRmjUnw2QODwvBjd
+ThpfeeFSpzjCnLvrdHxtNl8OPivJ7yhTUHmQW1WwjiEH/Xc43ttlKMDUf/q5exMC
+JWFiuiI/
+-----END PUBLIC KEY-----
+
+2026/06/15 09:14:44 ======= generate test signature  ========
+Signature : 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
+
+Verified signature using standard go
+Verify validation digest: be2f5f822b25dc6f92691ef05138918c4126770c2744f8f337c2186425a5a7c2
+```
+
+Also see
+
+```
+pg 197 https://trustedcomputinggroup.org/wp-content/uploads/Trusted-Platform-Module-2.0-Library-Part-2-Structures_Version-185_pub.pdf
+
+AllowExternalMu:
+
+If YES, this key can be used with TPM2_VerifyDigestSignature() and TPM2_SignDigest(). In the context of these two commands, the digest value will be interpreted as the 512-byte external Mu (𝜇) 
+If NO, this key cannot be used with TPM2_VerifyDigestSignature() and TPM2_SignDigest().
+
+ML-DSA keys can always be used with TPM2_SignSequenceComplete and TPM2_VerifySequenceComplete().
+```

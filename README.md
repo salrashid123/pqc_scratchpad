@@ -29,6 +29,7 @@ This repo is just a collection of `PQC` tools and sample code.
   - [MLKEM Python](#mlkem-python)
   - [MLKEM CMS](#mlkem-cms)
 * [SLH-DSA](#slh-dsa)
+* [Trusted Platform Module PQC](#trusted-platform-module-pqc)
 * [Openssl key formats](#openssl-key-formats)
   - [ML-KEM Format](#ml-kem-format)
   - [ML-DSA Format](#ml-dsa-format)
@@ -570,6 +571,10 @@ docker run -v /dev/urandom:/dev/urandom -ti salrashid123/openssl-pqs:3.5.0-dev
 ```
 
 If you wanted to read in a `bare-seed` keyfile using `https://pkg.go.dev/github.com/cloudflare/circl@v1.6.2/sign/slhdsa` then sign/verify, see [slhdsa/](slhdsa/) folder
+
+## Trusted Platform Module PQC
+
+`TPM rev.185` specifications defines `MLDSA/MLKEM` support.  The folder under [tpm/](tpm/) describes a patch you can apply to go-tpm to test the structures.  Note its an unsupported patch.
 
 ## Openssl key formats
 
