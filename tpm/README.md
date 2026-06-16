@@ -30,26 +30,31 @@ git checkout 9f0977c7f65a2d778e895ebeb35440b2a707eaf
 git apply ../pqctpm.diff
 ```
 
+(note the patch above modifies the session validation ref [wolfTPM issue 529](https://github.com/wolfSSL/wolfTPM/issues/529) )
+
 ### Setup
 
 Install `wolfTPM` with mldsa/mlkem support
 
 ```bash
+export ROOT_DIR=$HOME/workspace
+mkdir $ROOT_DIR
+
 git clone https://github.com/wolfSSL/wolfssl.git
 cd wolfssl
 ./autogen.sh
-./configure   --enable-wolftpm --enable-mldsa --enable-mlkem  --enable-harden --enable-keygen --prefix=`pwd`/wolfssl
+./configure   --enable-wolftpm --enable-mldsa --enable-mlkem  --enable-harden --enable-keygen --prefix=$ROOT_DIR/wolfssl
 make
 make install
 
 git clone https://github.com/wolfSSL/wolfTPM.git
 cd wolfTPM
 ./autogen.sh
-./configure  --enable-fwtpm --enable-swtpm --enable-pqc --with-wolfcrypt=`pwd`/wolfssl --prefix=`pwd`/wolftpm
+./configure  --enable-fwtpm --enable-swtpm --enable-pqc --with-wolfcrypt=$ROOT_DIR/wolfssl --prefix=$ROOT_DIR/wolftpm
 make
 make install
 
-cd wolftpm/bin
+cd $ROOT_DIR/wolftpm/bin
 ./fwtpm_server --clear
 ```
 
