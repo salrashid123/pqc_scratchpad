@@ -47,29 +47,6 @@ index 70edae2..0f8b740 100644
  )
  
  // TPMRC represents a TPM_RC.
-diff --git a/tpm2/sessions.go b/tpm2/sessions.go
-index 63f48e5..bf14122 100644
---- a/tpm2/sessions.go
-+++ b/tpm2/sessions.go
-@@ -116,12 +116,12 @@ func (s *pwSession) Validate(_ TPMRC, _ TPMCC, _ []byte, _ []TPM2BName, _ int, a
- 	if len(auth.Nonce.Buffer) != 0 {
- 		return fmt.Errorf("expected empty nonce in response auth to PW session, got %x", auth.Nonce)
- 	}
--	expectedAttrs := TPMASession{
--		ContinueSession: true,
--	}
--	if auth.Attributes != expectedAttrs {
--		return fmt.Errorf("expected only ContinueSession in response auth to PW session, got %v", auth.Attributes)
--	}
-+	// expectedAttrs := TPMASession{
-+	// 	ContinueSession: true,
-+	// }
-+	// if auth.Attributes != expectedAttrs {
-+	// 	return fmt.Errorf("expected only ContinueSession in response auth to PW session, got %v", auth.Attributes)
-+	// }
- 	if len(auth.Authorization.Buffer) != 0 {
- 		return fmt.Errorf("expected empty HMAC in response auth to PW session, got %x", auth.Authorization)
- 	}
 diff --git a/tpm2/structures.go b/tpm2/structures.go
 index 17a6dd9..c92457f 100644
 --- a/tpm2/structures.go

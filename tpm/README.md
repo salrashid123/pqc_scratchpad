@@ -30,7 +30,6 @@ git checkout 9f0977c7f65a2d778e895ebeb35440b2a707eaf
 git apply ../pqctpm.diff
 ```
 
-(note the patch above modifies the session validation ref [wolfTPM issue 529](https://github.com/wolfSSL/wolfTPM/issues/529) )
 
 ### Setup
 
