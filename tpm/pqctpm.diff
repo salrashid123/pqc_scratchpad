@@ -301,7 +301,7 @@ index 17a6dd9..c92457f 100644
  // See definition in Part 2: Structures, section 12.2.3.8.
  type TPMTPublicParms struct {
 diff --git a/tpm2/tpm2.go b/tpm2/tpm2.go
-index e921c0b..bf570ae 100644
+index e921c0b..d09c477 100644
 --- a/tpm2/tpm2.go
 +++ b/tpm2/tpm2.go
 @@ -268,6 +268,52 @@ type LoadResponse struct {
@@ -357,10 +357,12 @@ index e921c0b..bf570ae 100644
  // LoadExternal is the input to TPM2_LoadExternal.
  // See definition in Part 3, Commands, section 12.3
  type LoadExternal struct {
-@@ -1034,6 +1080,131 @@ type SignResponse struct {
+@@ -1034,6 +1080,164 @@ type SignResponse struct {
  	Signature TPMTSignature
  }
  
++// *********************
++
 +type SignDigest struct {
 +	// Handle of key that will perform signing
 +	KeyHandle handle `gotpm:"handle,auth"`
@@ -382,11 +384,37 @@ index e921c0b..bf570ae 100644
 +	return &rsp, nil
 +}
 +
-+// SignResponse is the response from TPM2_Sign.
 +type SignDigestResponse struct {
 +	// the signature
 +	Signature TPMTSignature
 +}
++
++// *********************
++
++type VerifyDigestSignature struct {
++	KeyHandle handle `gotpm:"handle,auth"`
++	Context   TPM2BSignatureContext
++	Digest    TPM2BDigest
++	Signature TPMTSignature
++}
++
++// Command implements the Command interface.
++func (VerifyDigestSignature) Command() TPMCC { return TPMCCVerifyDigestSignature }
++
++// Execute executes the command and returns the response.
++func (cmd VerifyDigestSignature) Execute(t transport.TPM, s ...Session) (*VerifyDigestSignatureResponse, error) {
++	var rsp VerifyDigestSignatureResponse
++	if err := execute[VerifyDigestSignatureResponse](t, cmd, &rsp, s...); err != nil {
++		return nil, err
++	}
++	return &rsp, nil
++}
++
++type VerifyDigestSignatureResponse struct {
++	Validation TPMTTKVerified
++}
++
++// *********************
 +
 +type SignSequenceStart struct {
 +	// Handle of key that will perform signing
@@ -414,6 +442,7 @@ index e921c0b..bf570ae 100644
 +	SequenceHandle TPMIDHObject `gotpm:"handle"`
 +}
 +
++// *********************
 +type SignSequenceComplete struct {
 +	SequenceHandle handle `gotpm:"handle,auth,anon"`
 +	KeyHandle      handle `gotpm:"handle,auth"`
@@ -438,6 +467,7 @@ index e921c0b..bf570ae 100644
 +	Signature TPMTSignature
 +}
 +
++// *********************
 +type VerifySequenceStart struct {
 +	KeyHandle handle `gotpm:"handle,auth"`
 +	Auth      TPM2BAuth
@@ -463,6 +493,8 @@ index e921c0b..bf570ae 100644
 +	SequenceHandle TPMIDHObject `gotpm:"handle"`
 +}
 +
++// *********************
++
 +type VerifySequenceComplete struct {
 +	SequenceHandle handle `gotpm:"handle,auth,anon"`
 +	KeyHandle      handle `gotpm:"handle,auth"`
@@ -486,6 +518,7 @@ index e921c0b..bf570ae 100644
 +	Validation TPMTTKVerified
 +}
 +
++// *********************
  // PCRExtend is the input to TPM2_PCR_Extend.
  // See definition in Part 3, Commands, section 22.2
  type PCRExtend struct {
