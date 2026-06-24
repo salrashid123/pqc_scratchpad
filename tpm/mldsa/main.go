@@ -99,26 +99,6 @@ func main() {
 
 	rwr := transport.FromReadWriter(rwc)
 
-	// first try to read what the max MLDSA buffer and set it as maxInputBuffer variable
-	// 11.3.4 MAX_MLDSA_SIG_SIZE  pg 186 https://trustedcomputinggroup.org/wp-content/uploads/Trusted-Platform-Module-2.0-Library-Part-2-Structures_Version-185_pub.pdf
-	getCmd := tpm2.GetCapability{
-		Capability:    tpm2.TPMCapTPMProperties,
-		Property:      uint32(tpm2.TPMPTInputBuffer),
-		PropertyCount: 1,
-	}
-	getRsp, err := getCmd.Execute(rwr)
-	if err != nil {
-		log.Fatalf("can't get capabilities %v", err)
-	}
-
-	tp, err := getRsp.CapabilityData.Data.TPMProperties()
-	if err != nil {
-		log.Fatalf("can't read capabilities%v", err)
-	}
-
-	blockSize := int(tp.TPMProperty[0].Value)
-	log.Printf("TPM Max buffer %d", blockSize)
-
 	// first create a primary
 	log.Printf("======= createPrimary ========")
 

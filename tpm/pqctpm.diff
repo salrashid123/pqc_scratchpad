@@ -1,5 +1,5 @@
 diff --git a/tpm2/constants.go b/tpm2/constants.go
-index 70edae2..0f8b740 100644
+index 70edae2..397eaa9 100644
 --- a/tpm2/constants.go
 +++ b/tpm2/constants.go
 @@ -75,6 +75,27 @@ const (
@@ -47,6 +47,15 @@ index 70edae2..0f8b740 100644
  )
  
  // TPMRC represents a TPM_RC.
+@@ -588,6 +619,8 @@ const (
+ 	TPMPTAuditCounter0 TPMPT = 0x00000213
+ 	// the low-order 32 bits of the command audit counter
+ 	TPMPTAuditCounter1 TPMPT = 0x00000214
++
++	TPMPTMLParameterSet TPMPT = 0x00000131 //  PT_FIXED + 49
+ )
+ 
+ // TPMPTPCR represents a TPM_PT_PCR.
 diff --git a/tpm2/structures.go b/tpm2/structures.go
 index 17a6dd9..c92457f 100644
 --- a/tpm2/structures.go

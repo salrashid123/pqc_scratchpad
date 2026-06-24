@@ -207,3 +207,23 @@ If NO, this key cannot be used with TPM2_VerifyDigestSignature() and TPM2_SignDi
 
 ML-DSA keys can always be used with TPM2_SignSequenceComplete and TPM2_VerifySequenceComplete().
 ```
+
+
+### GetCapability
+
+recalls TPM parameters for ML
+
+```bash
+$ go run getcap/main.go 
+2026/06/24 11:27:47 ======= Init  ========
+2026/06/24 11:27:47 TPM Max buffer 8192
+2026/06/24 11:27:47 TPMPTMLParameterSet Bits:          111111
+2026/06/24 11:27:47 TPMPTMLParameterSet Padded Bits:   00000000000000000000000000111111
+2026/06/24 11:27:47 TPM_MLKEM_512_ENABLED true
+2026/06/24 11:27:47 TPM_MLKEM_768_ENABLED true
+2026/06/24 11:27:47 TPM_MLKEM_1024_ENABLED true
+2026/06/24 11:27:47 TPM_MLDSA_44_ENABLED true
+2026/06/24 11:27:47 TPM_MLDSA_65_ENABLED true
+2026/06/24 11:27:47 TPM_MLDSA_87_ENABLED true
+2026/06/24 11:27:47 TPM_MLDSA_ALLOW_EXTERNAL_MU false
+```
