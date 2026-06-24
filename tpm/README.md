@@ -35,6 +35,8 @@ git apply ../pqctpm.diff
 
 Install `wolfTPM` with mldsa/mlkem support
 
+note, you'll need wolfTPM from HEAD:  see [https://github.com/wolfSSL/wolfTPM/issues/529](https://github.com/wolfSSL/wolfTPM/issues/529)
+
 ```bash
 export ROOT_DIR=$HOME/workspace
 mkdir $ROOT_DIR
