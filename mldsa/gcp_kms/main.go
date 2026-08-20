@@ -13,7 +13,7 @@ import (
 	cloudkms "cloud.google.com/go/kms/apiv1"
 	kmspb "cloud.google.com/go/kms/apiv1/kmspb"
 
-	"filippo.io/mldsa"
+	"crypto/mldsa"
 )
 
 var (

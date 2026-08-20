@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
 
-	"filippo.io/mldsa"
+	"crypto/mldsa"
 )
 
 /*

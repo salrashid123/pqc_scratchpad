@@ -2,7 +2,7 @@ package main
 
 import (
 	"crypto"
-	"crypto/mldsa" //"filippo.io/mldsa"
+	"crypto/mldsa"
 	"crypto/sha3"
 	"crypto/x509/pkix"
 	"encoding/asn1"

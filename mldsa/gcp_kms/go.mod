@@ -1,11 +1,8 @@
 module main
 
-go 1.25.0
+go 1.27
 
-require (
-	cloud.google.com/go/kms v1.21.1
-	filippo.io/mldsa v0.0.0-20260215214346-43d0283efc3e
-)
+require cloud.google.com/go/kms v1.21.1
 
 require (
 	cloud.google.com/go v0.118.3 // indirect

@@ -132,7 +132,7 @@ SharedSecret from decapsulation og3qWqR9RRldaq3U53wcQIQEdkBCPhOIMUOP0z1ZpY8=
 The verification is done in two ways:
 
 1. Sign with TPM
-2. Verify with standard go (currently `"filippo.io/mldsa"` and later `crypto/mldsa`)
+2. Verify with standard go (`crypto/mldsa`)
 3. Verify with TPM
 
 Note, the mldsa signature here does not use external mu.

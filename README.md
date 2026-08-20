@@ -105,9 +105,7 @@ openssl pkey  -in bare-seed.pem   -pubout -out public.pem
 
 ### MLDSA standard go
 
-At the time of writing (3/6/26), mldsa is not supported in go but its pending on [https://github.com/golang/go/issues/77626](https://github.com/golang/go/issues/77626).
-
-However, you can either inject the candidate changes into your own go library or follow
+`go1.27` supports `crypto/mldsa`!!!
 
 - [Generating and verifying MLDSA signatures using standard go](https://github.com/salrashid123/pqc_scratchpad/tree/main/mldsa/std_go)
 

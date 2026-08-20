@@ -1,9 +1,8 @@
 module main
 
-go 1.25.0
+go 1.27
 
 require (
-	filippo.io/mldsa v0.0.0-20260215214346-43d0283efc3e
 	github.com/aws/aws-sdk-go-v2/config v1.32.11
 	github.com/aws/aws-sdk-go-v2/service/kms v1.50.2
 )
